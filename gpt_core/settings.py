@@ -27,4 +27,6 @@ def reload_prompts(yaml_path: str = "./prompts.yaml"):
 
     with open(yaml_path, 'r') as f:
         # Read prompts that will be used to make summaries
-        PROMPTS = yaml.safe_load(f)
+        for prompt, content in yaml.safe_load(f).items():
+            # item assignment to avoid making local variable
+            PROMPTS[prompt] = content
