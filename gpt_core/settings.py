@@ -2,6 +2,7 @@ import openai
 import yaml
 
 import os
+from warnings import warn
 
 PROMPTS = {}
 
@@ -17,7 +18,8 @@ def reload_openai_key(key_yaml_path: str = "./openai_key.yaml"):
         openai.api_key = os.environ.get("OPENAI_API_KEY")
 
     if not openai.api_key or openai.api_key == "OPENAI_API_KEY":
-        raise ValueError("Invalid OpenAI API key - check settings")
+        warn("Invalid OpenAI API key - check settings."
+             "\nOtherwise GPT core will not work")
 
 
 def reload_prompts(yaml_path: str = "./prompts.yaml"):
