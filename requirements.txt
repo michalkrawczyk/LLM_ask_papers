@@ -1,0 +1,5 @@
+openai==0.27.6
+PyPDF2==3.0.1
+arxiv==1.4.7
+pyyaml==6.0
+tqdm==4.65.0

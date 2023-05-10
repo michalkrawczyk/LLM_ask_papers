@@ -1,0 +1,30 @@
+summary:
+  "Identify the following items from given text, delimited by triple backticks: \n
+  - New Features: (listed each of names of new features, functions and functionalities) \n
+  - New Stategies: (listed new stategies and techniques) \n
+  - Problems: (listed tackled problems and approaches) \n
+  - Design: (network design) \n
+  - maximum of three sentences for obtained results.  \n
+
+  Format your response to pointed answears for each category. \n
+  For each feature in identified new features write on the end few sentences of summary
+
+  Review text:"
+ 
+short_decription_json:
+  "Identify the following items from given text, delimited by triple backticks:
+  - Model Name
+  - Model category(e.g Object Detection, NLP or image generation)
+  - SOTA: if Model is State-of-the-Art 
+  - New Features: new features introduced 
+  - Year: Year of publish
+
+  Format your response as a JSON object with \
+  'Model Name', 'Model Category', 'SOTA', 'New Features'
+  and 'Year' as the keys.
+  If the information isn't present, use 'unknown'
+  as the value.\n
+  Make your response as short as possible.\n
+  Format the SOTA value as a boolean.
+
+  Review text:"
