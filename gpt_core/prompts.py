@@ -110,7 +110,7 @@ def get_summary(text: Union[str, PaperData],
     # Counter for ensuring not exceeding limit rate of GPT (3 prompts / min)
     prompts_used = 1
 
-    for text_batch in tqdm(text_batches[1:]):
+    for text_batch in tqdm(text_batches[1:], desc="Scanning document"):
         if prompts_used % 4 == 0:
             sleep(60)
 
