@@ -1,4 +1,4 @@
-import arxiv_utils
+import arxiv
 from tqdm import tqdm
 
 import os
@@ -20,7 +20,7 @@ def download_paper_from_arxiv(id_list: List[str]) -> List[str]:
 
     """
     papers_downloaded = []
-    search = arxiv_utils.Search(id_list=id_list)
+    search = arxiv.Search(id_list=id_list)
 
     for paper in tqdm(search.results(), desc="Downloading files..."):
         file_path = paper.download_pdf()
@@ -49,10 +49,10 @@ def download_recent_papers_by_querry(querry: str, limit: float = 10.0) -> List[s
 
     """
     papers_downloaded = []
-    search = arxiv_utils.Search(
+    search = arxiv.Search(
         query=querry,
         max_results=limit,
-        sort_by=arxiv_utils.SortCriterion.SubmittedDate)
+        sort_by=arxiv.SortCriterion.SubmittedDate)
 
     for paper in tqdm(search.results(), desc="Downloading files..."):
         file_path = paper.download_pdf()
