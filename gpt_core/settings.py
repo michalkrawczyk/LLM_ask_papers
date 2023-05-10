@@ -14,12 +14,11 @@ def reload_openai_key(key_yaml_path: str = "./openai_key.yaml"):
             # Read API KEY for ChatGPT
             openai.api_key = yaml.safe_load(f)["openai_api_key"]
 
-    else:
+    if not openai.api_key or openai.api_key == "OPENAI_API_KEY":
         openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-    if not openai.api_key or openai.api_key == "OPENAI_API_KEY":
-        warn("Invalid OpenAI API key - check settings."
-             "\nOtherwise GPT core will not work")
+        if not openai.api_key:
+            raise ValueError("Invalid OpenAI API key - check settings.")
 
 
 def reload_prompts(yaml_path: str = "./prompts.yaml"):
