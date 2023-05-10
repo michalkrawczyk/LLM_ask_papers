@@ -1,25 +1,15 @@
-import openai
-import yaml
+from .settings import PROMPTS, reload_openai_key, reload_prompts
 
-from .prompts import get_description_json, get_summary_3
+reload_openai_key()
+reload_prompts()
 
-import os
-
-if os.path.isfile('openai_key.yaml'):
-    with open('openai_key.yaml', 'r') as f:
-        # Read API KEY for ChatGPT
-        openai.api_key = yaml.safe_load(f)["openai_api_key"]
-
-else:
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
-
-
-with open('prompts.yaml', 'r') as f:
-    # Read prompts that will be used to make summaries
-  PROMPTS = yaml.safe_load(f)
+# Avoiding Problem with Circular Import
+from .prompts import get_description_json, get_summary
 
 __all__ = [
     "get_description_json",
-    "get_summary_3",
-    "PROMPTS"
+    "get_summary",
+    "PROMPTS",
+    "reload_prompts",
+    "reload_openai_key"
 ]

@@ -4,6 +4,7 @@ from PyPDF2 import PdfReader
 from dataclasses import dataclass, field
 from typing import List
 
+
 @dataclass(frozen=True)
 class PageData:
     """ Container for page(text) data

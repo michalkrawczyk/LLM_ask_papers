@@ -61,8 +61,8 @@ def get_description_json(text: Union[str, PaperData], max_tokens: int = 1100) ->
     return json.loads(response)
 
 
-def get_summary_3(text: Union[str, PaperData],
-                  max_tokens_per_prompt: int = 1200) -> str:
+def get_summary(text: Union[str, PaperData],
+                max_tokens_per_prompt: int = 1200) -> str:
     """ Obtain Summary for research paper
 
     Parameters
