@@ -90,9 +90,7 @@ def get_summary(text: Union[str, PaperData],
         text_batches = [t.text for t in
                         text.join_pages_by_length(max_tokens_per_prompt)]
 
-    # base_prompt = f"""{PROMPTS["summary"]} ''''{text_batches[0]}'''"""
 
-    # system_prompt = f""" Your task is to make summary for research paper.
     # You have to identify the following items from given text, delimited by triple backticks:
 
     # - New Features: (listed each of names of new features, functions and functionalities)
@@ -116,19 +114,22 @@ def get_summary(text: Union[str, PaperData],
         if prompts_used % 4 == 0:
             sleep(60)
 
-        continue_prompt = f"""
-          You have to identify the following items from given text, delimited by triple backticks:
-          - New Features: (listed every name for new features, functions and functionalities and corresponding components)
-          - New Stategies: (listed new stategies and techniques)
-          - Problems: (listed tackled problems and approaches)
-          - Design: (network design)
-    
-          After that fill the summary in quotes with missing informations.
+        continue_prompt = f"""{PROMPTS["continue_summary"]}
           text: '''{text_batch}'''
     
           summary to fill: {responses[-1]}
     
           """
+
+        # "You have to identify the following items from given text, delimited by triple backticks: \n
+        # - New Features: (listed every name for new features, functions and functionalities
+        #   and corresponding components)
+        # - New Stategies: (listed new stategies and techniques)
+        # - Problems: (listed tackled problems and approaches)
+        # - Design: (network design) \n
+        #
+        #    After that fill the summary in quotes with missing informations."
+
         responses.append(get_completion(continue_prompt))
         prompts_used += 1
 
