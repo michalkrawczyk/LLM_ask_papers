@@ -33,10 +33,10 @@ def check_prompt_rate(limit_rate: int = 3):
             _prompt_count.counter % (limit_rate + 1) == 0:
         time_difference = timer() - _prompt_count.before_last_prompt_time
 
-        if time_difference <= 60.0:
+        if time_difference <= 61.0:
             logging.warning("Maximum rate of prompts per minute exceeded "
                             "- Going to sleep to normalize rate (max for 1 min)")
-            sleep(int(61 - time_difference))
+            sleep(int(62 - time_difference))
 
         # else Rate is ok - no need to sleep
 
@@ -89,7 +89,7 @@ def get_completion(prompt: str, model="gpt-3.5-turbo", max_attempts: int = 3):
             if attempts == (max_attempts - 1):
                 raise err
 
-            # Sleep 3 seconds after failed attempt, due to most probably busy server
-            sleep(3)
+            # Sleep 5 seconds after failed attempt, due to most probably busy server
+            sleep(5)
 
     return response.choices[0].message["content"]
