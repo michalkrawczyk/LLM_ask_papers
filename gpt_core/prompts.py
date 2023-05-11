@@ -5,7 +5,6 @@ from .utils import get_completion, create_batches
 from gpt_core import PROMPTS
 
 import json
-from time import sleep
 from typing import Union
 
 
@@ -108,11 +107,8 @@ def get_summary(text: Union[str, PaperData],
 
     responses = [get_completion(base_prompt)]
     # Counter for ensuring not exceeding limit rate of GPT (3 prompts / min)
-    prompts_used = 1
 
     for text_batch in tqdm(text_batches[1:], desc="Scanning document"):
-        if prompts_used % 4 == 0:
-            sleep(60)
 
         continue_prompt = f"""{PROMPTS["continue_summary"]}
           text: '''{text_batch}'''
@@ -120,7 +116,6 @@ def get_summary(text: Union[str, PaperData],
           summary to fill: {responses[-1]}
     
           """
-
         # "You have to identify the following items from given text, delimited by triple backticks: \n
         # - New Features: (listed every name for new features, functions and functionalities
         #   and corresponding components)
@@ -131,6 +126,5 @@ def get_summary(text: Union[str, PaperData],
         #    After that fill the summary in quotes with missing informations."
 
         responses.append(get_completion(continue_prompt))
-        prompts_used += 1
 
     return responses
