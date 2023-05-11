@@ -3,14 +3,19 @@ import openai
 from itertools import islice
 from time import sleep
 import logging
+from timeit import default_timer as timer
 
 
 def _prompt_count(attempts: int = 1):
     # Wrapper to create used prompt counter
     _prompt_count.counter += attempts
+    _prompt_count.before_last_prompt_time = _prompt_count.last_prompt_time
+    _prompt_count.last_prompt_time = timer()
 
 
 _prompt_count.counter = 0
+_prompt_count.last_prompt_time = 0
+_prompt_count.before_last_prompt_time = 0
 
 
 def check_prompt_rate(limit_rate: int = 3):
@@ -26,9 +31,14 @@ def check_prompt_rate(limit_rate: int = 3):
     """
     if _prompt_count.counter > 0 and \
             _prompt_count.counter % (limit_rate + 1) == 0:
-        logging.warning("Maximum rate of prompts per minute exceeded "
-                        "- Going to sleep for 1 minute")
-        sleep(60)
+        time_difference = timer() - _prompt_count.before_last_prompt_time
+
+        if time_difference <= 60.0:
+            logging.warning("Maximum rate of prompts per minute exceeded "
+                            "- Going to sleep to normalize rate (max for 1 min)")
+            sleep(int(61 - time_difference))
+
+        # else Rate is ok - no need to sleep
 
     return _prompt_count.counter
 
