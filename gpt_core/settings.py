@@ -2,7 +2,6 @@ import openai
 import yaml
 
 import os
-from warnings import warn
 
 PROMPTS = {}
 

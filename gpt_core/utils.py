@@ -26,6 +26,8 @@ def check_prompt_rate(limit_rate: int = 3):
     """
     if _prompt_count.counter > 0 and \
             _prompt_count.counter % (limit_rate + 1) == 0:
+        logging.warning("Maximum rate of prompts per minute exceeded "
+                        "- Going to sleep for 1 minute")
         sleep(60)
 
     return _prompt_count.counter
