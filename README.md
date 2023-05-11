@@ -1,5 +1,5 @@
 # Arxiv_GPT_Summarizer
-<a href="https://colab.research.google.com/github/ultralytics/yolov5/blob/master/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> <br></br>
+<a href="https://colab.research.google.com/drive/1Q-zcKeC3HdM35uQeQqLXfIUp09nj4uQM?usp=sharing"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> <br></br>
 Experimental code for searching Arxiv papers (by paper id, or most recent by specific tag) and summarize them with ChatGPT.
 - 
 - [Providing OpenAI API Key](https://github.com/michalkrawczyk/Arxiv_GPT_Summarizer/issues/7) 
