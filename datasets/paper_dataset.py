@@ -125,7 +125,7 @@ class PaperDataset:
 
         return list(data_fields)
 
-    def get_values_by_key(self, search_key: str):
+    def list_values_by_field(self, search_key: str):
         values = set()
 
         for data in self._papers.values():
@@ -138,7 +138,7 @@ class PaperDataset:
 
     @property
     def list_new_features(self):
-        return self.get_values_by_key("New Features")
+        return self.list_values_by_field("New Features")
 
     def search_by_field_value(self, field: str, value: str, regex_search: bool = True):
         """ Search papers with specific value in given field
