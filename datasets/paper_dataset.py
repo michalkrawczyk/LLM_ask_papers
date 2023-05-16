@@ -7,7 +7,7 @@ from tqdm import tqdm
 import logging
 import os
 import re
-from typing import List
+from typing import List, Union, Tuple
 
 
 class PaperDataset:
@@ -170,16 +170,16 @@ class PaperDataset:
 
         Returns
         -------
-        found: list
-            List containing all papers matching searched value
+        found: dict
+            Dictionary containing all papers matching searched value
 
         """
         if regex_search:
-            found = [data for data in self._papers.values()
-                     if re.search(value, data.get(field, ""))]
+            found = {paper: data for paper, data in self._papers.items()
+                     if re.search(value, data.get(field, ""))}
         else:
-            found = [data for data in self._papers.values()
-                     if data.get(field, "") == value]
+            found = {paper: data for paper, data in self._papers.items()
+                     if data.get(field, "") == value}
 
         if not found:
             logging.warning(f"Values for field: '{field}' not found "
@@ -190,3 +190,27 @@ class PaperDataset:
     def get_paper_by_filename(self, filename):
         """ Search Paper Data by filename"""
         return self._papers.get(filename, None)
+
+    def filter_by_categories(self, category: Union[Tuple[str], str]):
+        """ Filter Papers by Category (e.g. Object Detection)
+
+        Parameters
+        ----------
+        category: Union[Tuple[str], str]
+            One String or tuple with strings with categories to search
+
+        Returns
+        -------
+        found: dict
+            Dictionary containing all papers matching searched categories
+
+        """
+        if isinstance(category, str):
+            categories = tuple(category.lower())
+        else:
+            categories = tuple(c.lower() for c in category)
+
+        found = {paper: data for paper, data in self._papers.items()
+                 if data.get("Category", "").lower() in categories}
+
+        return found
