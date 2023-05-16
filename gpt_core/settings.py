@@ -4,6 +4,7 @@ import yaml
 import os
 
 PROMPTS = {}
+# TODO: Think about adding test for prompt content checks
 
 
 def reload_openai_key(key_yaml_path: str = "./openai_key.yaml"):
