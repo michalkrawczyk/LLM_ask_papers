@@ -26,10 +26,14 @@ class PaperDataset:
 
         Returns
         -------
+        self
+            self obejct for chaining
 
         """
         downloaded_papers = set(download_paper_from_arxiv(id_list, output_dir))
         self._add_papers_by_filepath(downloaded_papers)
+
+        return self
 
     def search_and_add_papers(self, search_query: str, limit: float = 10.0,
                               output_dir: str = "."):
@@ -48,12 +52,16 @@ class PaperDataset:
 
         Returns
         -------
+        self
+            self obejct for chaining
 
         """
 
         downloaded_papers = set(download_recent_papers_by_querry(
             search_query, limit, output_dir))
         self._add_papers_by_filepath(downloaded_papers)
+
+        return self
 
     def add_paper(self, filepath: str, reload_if_exist: bool = False):
         """ Add single paper with summary to dataset
@@ -65,6 +73,11 @@ class PaperDataset:
 
         reload_if_exist: bool
             If True - overwrites paper data in dataset if exist
+
+        Returns
+        -------
+        self
+            self obejct for chaining
 
         """
         if os.path.basename(filepath) in self._papers and not reload_if_exist:
@@ -81,6 +94,8 @@ class PaperDataset:
 
         except Exception as err:
             logging.error(f"Failed to update: {filepath} - {err}")
+
+        return self
 
     def _add_papers_by_filepath(self, files: set):
         """ Update dataset dictionary with new files and their summaries.
