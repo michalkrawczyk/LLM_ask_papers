@@ -9,13 +9,15 @@ from typing import List
 
 
 def _clean_filename_str(f_str: str):
-    """ Clean filename string from punctuations and whitespaces"""
-    regex = re.compile('[%s]' % re.escape(string.punctuation + string.whitespace))
-    return regex.sub('_', f_str).lstrip('_')
+    """Clean filename string from punctuations and whitespaces"""
+    regex = re.compile("[%s]" % re.escape(string.punctuation + string.whitespace))
+    return regex.sub("_", f_str).lstrip("_")
 
 
-def download_paper_from_arxiv(id_list: List[str], output_dir: str = ".", update_existed: bool = False) -> List[str]:
-    """ Download research papers from Arxiv by paper id
+def download_paper_from_arxiv(
+    id_list: List[str], output_dir: str = ".", update_existed: bool = False
+) -> List[str]:
+    """Download research papers from Arxiv by paper id
 
     Parameters
     ----------
@@ -44,7 +46,9 @@ def download_paper_from_arxiv(id_list: List[str], output_dir: str = ".", update_
         paper_filepath = f"{output_dir}{os.sep}{paper_id}.{paper_title}.pdf"
 
         if not os.path.isfile(paper_filepath) or update_existed:
-            file_path = paper.download_pdf(dirpath=output_dir, filename=f"{os.path.basename(paper_filepath)}")
+            file_path = paper.download_pdf(
+                dirpath=output_dir, filename=f"{os.path.basename(paper_filepath)}"
+            )
             papers_downloaded.append(file_path)
         else:
             logging.info(f"File Already Exist: {paper_filepath}")
@@ -53,9 +57,13 @@ def download_paper_from_arxiv(id_list: List[str], output_dir: str = ".", update_
     return papers_downloaded
 
 
-def download_recent_papers_by_querry(querry: str, limit: float = 10.0,
-                                     output_dir: str = ".", update_existed: bool = False) -> List[str]:
-    """ Download research papers from Arxiv by result of search querry
+def download_recent_papers_by_querry(
+    querry: str,
+    limit: float = 10.0,
+    output_dir: str = ".",
+    update_existed: bool = False,
+) -> List[str]:
+    """Download research papers from Arxiv by result of search querry
 
     Parameters
     ----------
@@ -79,9 +87,8 @@ def download_recent_papers_by_querry(querry: str, limit: float = 10.0,
     """
     papers_downloaded = []
     search = arxiv.Search(
-        query=querry,
-        max_results=limit,
-        sort_by=arxiv.SortCriterion.SubmittedDate)
+        query=querry, max_results=limit, sort_by=arxiv.SortCriterion.SubmittedDate
+    )
 
     for paper in tqdm(search.results(), desc="Downloading files..."):
         paper_id = os.path.split(paper.entry_id)[-1]
@@ -89,7 +96,9 @@ def download_recent_papers_by_querry(querry: str, limit: float = 10.0,
         paper_filepath = f"{output_dir}{os.sep}{paper_id}.{paper_title}.pdf"
 
         if not os.path.isfile(paper_filepath) or update_existed:
-            file_path = paper.download_pdf(dirpath=output_dir, filename=f"{os.path.basename(paper_filepath)}")
+            file_path = paper.download_pdf(
+                dirpath=output_dir, filename=f"{os.path.basename(paper_filepath)}"
+            )
             papers_downloaded.append(file_path)
         else:
             logging.info(f"File Already Exist: {paper_filepath}")
