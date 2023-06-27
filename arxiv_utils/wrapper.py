@@ -86,7 +86,7 @@ class ArxivAPIWrapper2(BaseModel):
     doc_content_chars_max: Union[int, None] = None
     ARXIV_MAX_QUERY_LENGTH: Union[int, None] = 300
 
-    save_pdf: bool = False
+    save_pdf: bool = True
     file_save_dir: str = "."
     overwrite_existing: bool = False
 
