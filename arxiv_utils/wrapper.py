@@ -90,6 +90,8 @@ class ArxivAPIWrapper2(BaseModel):
     file_save_dir: str = "."
     overwrite_existing: bool = False
 
+    # verbose: bool = False
+
     @root_validator()
     def validate_variables(cls, values: Dict) -> Dict:
         values["_arxiv_exceptions"] = (ArxivError, UnexpectedEmptyPageError, HTTPError)
@@ -105,8 +107,9 @@ class ArxivAPIWrapper2(BaseModel):
             raise ValueError("Invalid Output directory for downloaded documents ")
 
         for v in ["ARXIV_MAX_QUERY_LENGTH", "doc_content_chars_max"]:
-            if v < 1:
+            if values[v] and values[v] < 1:
                 logger.warning(f"String indexing with zero or less value: {v}")
+                print(values[v])
 
         return values
 
@@ -161,12 +164,15 @@ class ArxivAPIWrapper2(BaseModel):
             paper_filepath = f"{self.file_save_dir}{os.sep}{paper_id}.{paper_title}.pdf"
 
             try:
-                if not os.path.isfile(paper_filepath) or self.overwrite_existing:
+                already_exist = os.path.isfile(paper_filepath)
+
+                if not already_exist or self.overwrite_existing:
                     file_path = result.download_pdf(
                         dirpath=self.file_save_dir,
                         filename=f"{os.path.basename(paper_filepath)}",
                     )
                 else:
+                    file_path = paper_filepath
                     logger.info(f"File Already Exist: {paper_filepath}")
 
                 with fitz.open(file_path) as f:
@@ -190,10 +196,12 @@ class ArxivAPIWrapper2(BaseModel):
             else:
                 extra_metadata = {}
             metadata = {
-                "Published": str(result.updated.date()),
-                "Title": result.title,
-                "Authors": ", ".join(a.name for a in result.authors),
-                "Summary": result.summary,
+
+                "title": result.title,
+                "authors": ", ".join(a.name for a in result.authors),
+                "summary": result.summary,
+                "published": str(result.updated.date()),
+                "file_path": paper_filepath if already_exist or self.save_pdf else "",
                 **extra_metadata,
             }
             doc = Document(
