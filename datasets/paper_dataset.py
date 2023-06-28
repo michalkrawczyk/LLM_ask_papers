@@ -24,7 +24,6 @@ import os
 import re
 from typing import List, Union, Tuple, Any, Dict, Optional, Iterable
 
-
 # TODO: Remove paper?
 # TODO: Langchain SummaryChain?
 
@@ -34,15 +33,13 @@ logger = logging.getLogger(__name__)
 
 def _get_document_name(document: Document):
     """Get name of document (Title or source)"""
-    if not document.metadata:
-        return "Unknown"
+    if document.metadata:
+        name = document.metadata.get("title") \
+            or document.metadata.get("source") \
+            or document.metadata.get("file_path")
 
-    if document.metadata.get("title"):
-        return document.metadata["title"]
-
-    # No title - return file_path instead
-    if document.metadata.get("source"):
-        return document.metadata["source"]
+        if name:
+            return name
 
     return "Unknown"
 
@@ -55,6 +52,7 @@ def get_document_info(document: Document):
 class PaperDatasetLC(BaseModel):
     _db: VectorStore = Chroma(embedding_function=OpenAIEmbeddings)
     _papers: Dict = dict()  # For listing included documents, retrieve whole documents
+
     # Also because of limits made from langchain on get() function
 
     @root_validator()
@@ -63,7 +61,7 @@ class PaperDatasetLC(BaseModel):
         pass
 
     def add_document(
-        self, document: Document, metadata: Optional[Dict] = None
+            self, document: Document, metadata: Optional[Dict] = None
     ) -> List[str]:
         """Add Document object to vector database
 
@@ -142,7 +140,8 @@ class PaperDatasetLC(BaseModel):
             return []  # No Object added - return empty list
 
     def add_texts(
-        self, texts: Iterable[str], metadatas: List[Dict], skip_invalid: bool = False
+            self, texts: Iterable[str], metadatas: List[Dict],
+            skip_invalid: bool = False
     ) -> List[str]:
         """Add multiple texts as separate documents to vector database
 
@@ -317,7 +316,8 @@ class PaperDatasetLC(BaseModel):
         return papers
 
     def similarity_search(
-        self, query: str, n_results: int = 3, filter: Optional[Dict[str, str]] = None
+            self, query: str, n_results: int = 3,
+            filter: Optional[Dict[str, str]] = None
     ) -> List[Document]:
         """Search by similarity of embeddings
 
@@ -344,7 +344,8 @@ class PaperDatasetLC(BaseModel):
         return self._db.similarity_search(query=query, k=n_results, filter=filter)
 
     def similiraty_search_with_scores(
-        self, query: str, n_results: int = 3, score_threshold: Optional[float] = None
+            self, query: str, n_results: int = 3,
+            score_threshold: Optional[float] = None
     ) -> List[Tuple[Document, float]]:
         """
 
@@ -370,7 +371,7 @@ class PaperDatasetLC(BaseModel):
         )
 
     def llm_search(
-        self, query: str, llm: Optional[BaseLanguageModel] = None, **kwargs: Any
+            self, query: str, llm: Optional[BaseLanguageModel] = None, **kwargs: Any
     ) -> str:
         """LLM search engine for searching content in documents
 
@@ -397,7 +398,7 @@ class PaperDatasetLC(BaseModel):
         return chain.run(query)
 
     def llm_search_with_sources(
-        self, query: str, llm: Optional[BaseLanguageModel] = None, **kwargs: Any
+            self, query: str, llm: Optional[BaseLanguageModel] = None, **kwargs: Any
     ) -> dict:
         """LLM search engine for searching content in documents with sources
 
@@ -455,7 +456,7 @@ class PaperDataset:
         return self
 
     def search_and_add_papers(
-        self, search_query: str, limit: float = 10.0, output_dir: str = "."
+            self, search_query: str, limit: float = 10.0, output_dir: str = "."
     ):
         """
         Download and add to dataset recent papers from Arxiv by results from search quarry
