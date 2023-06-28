@@ -1,4 +1,4 @@
-from PyPDF2 import PdfReader
+import fitz
 
 from dataclasses import dataclass, field
 from typing import List
@@ -53,8 +53,9 @@ class PaperData:
     _pages: List[PageData] = field(init=False)
 
     def __post_init__(self):
-        reader = PdfReader(self.filepath)
-        self._pages = [PageData(page.extract_text()) for page in reader.pages]
+        # reader = PdfReader(self.filepath)
+        with fitz.open(self.filepath) as f:
+            self._pages = [PageData(page.get_text()) for page in f]
 
     def __getitem__(self, i):
         # Access each page by index
