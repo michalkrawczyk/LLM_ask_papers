@@ -2,15 +2,18 @@ import openai
 import yaml
 
 import os
+from pathlib import Path
 
 PROMPTS = {}
+ROOT_PATH = Path(__file__).resolve().parent.parent
 # TODO: Think about adding test for prompt content checks
 
 
-def reload_openai_key(key_yaml_path: str = "./openai_key.yaml"):
+def reload_openai_key(key_yaml_path: str = ROOT_PATH / "openai_key.yaml"):
     """ Load OpenAI API Key from yaml file"""
+
     if os.path.isfile(key_yaml_path):
-        with open('openai_key.yaml', 'r') as f:
+        with open(key_yaml_path, 'r') as f:
             # Read API KEY for ChatGPT
             openai.api_key = yaml.safe_load(f)["openai_api_key"]
 
@@ -21,7 +24,7 @@ def reload_openai_key(key_yaml_path: str = "./openai_key.yaml"):
             raise ValueError("Invalid OpenAI API key - check settings.")
 
 
-def reload_prompts(yaml_path: str = "./prompts.yaml"):
+def reload_prompts(yaml_path: str = ROOT_PATH / "prompts.yaml"):
     """ Load yaml with prompts (commands to be executed for by GPT engine"""
     if not os.path.isfile(yaml_path):
         raise OSError("Prompts file not found")
