@@ -14,6 +14,7 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.llms.openai import OpenAI
 from langchain.schema import Document
 from langchain.vectorstores import Chroma, VectorStore
+import openai
 
 from pydantic import BaseModel, root_validator
 from tqdm import tqdm
@@ -24,9 +25,15 @@ import os
 import re
 from typing import List, Union, Tuple, Any, Dict, Optional, Iterable
 
+# TODO: Chroma db in validator or stale? - Add to validator and mark db as Optional[VectorStore] (to add in validator or post_init)
 # TODO: Remove paper?
 # TODO: Langchain SummaryChain?
+# TODO: Summary from whole paper and by similarity search (with check if embedding are present)
+# TODO: Consistant Import Libraries
+# TODO: Validator?
+# TODO: move db to validator (Initialize when not passed, with default setting?
 
+# TODO: (Optional) fix get() in langchain, to accepts also 'where'
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +57,7 @@ def get_document_info(document: Document):
 
 
 class PaperDatasetLC(BaseModel):
-    _db: VectorStore = Chroma(embedding_function=OpenAIEmbeddings)
+    _db: VectorStore = Chroma(embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key))
     _papers: Dict = dict()  # For listing included documents, retrieve whole documents
 
     # Also because of limits made from langchain on get() function
@@ -58,7 +65,7 @@ class PaperDatasetLC(BaseModel):
     @root_validator()
     def validate_dataset(cls, values: Dict) -> Dict:
         # TODO:Call db functions for check if implemented functionalities
-        pass
+        return values
 
     def add_document(
             self, document: Document, metadata: Optional[Dict] = None
@@ -97,8 +104,8 @@ class PaperDatasetLC(BaseModel):
             )
             return []  # No Object added - return empty list
 
-    def add_text_file(self, filepath, metadata: Optional[Dict] = None) -> List[str]:
-        """Add text from file to vector database
+    def add_pdf_file(self, filepath: str, metadata: Optional[Dict] = None) -> List[str]:
+        """Add pdf file to vector database
 
         Parameters
         ----------
@@ -113,27 +120,24 @@ class PaperDatasetLC(BaseModel):
             Uuid in list for added document with text in vector database
 
         """
-        try:
-            if filepath.endswith(".pdf"):
-                data = PyMuPDFLoader(filepath).load()
+        if not filepath.endswith(".pdf"):
+            f"Currently not supported format {os.path.splitext(filepath)[-1]}"
+            f" for file: {filepath}"
 
+        try:
+            data = PyMuPDFLoader(filepath).load()
+
+            if metadata:
                 for page in data:
-                    for key in metadata:
+                    for key in metadata.keys():
                         if key not in page.metadata or not page.metadata[key]:
                             # Add missing data
-                            page.metadata[key] = metadata["key"]
+                             page.metadata[key] = metadata["key"]
 
-                doc_uuids = self._db.add_documents(data)
-                self._papers.update({uid: doc for uid, doc in zip(doc_uuids, data)})
+            doc_uuids = self._db.add_documents(data)
+            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, data)})
 
-                return doc_uuids
-
-            raise NotImplementedError(
-                f"Currently not supported format for file: {filepath}"
-            )
-
-        # TODO: change NotImplementedError with other formats
-        # return self._db.add_texts(texts=texts, metadatas=[metadata] * len(texts))
+            return doc_uuids
 
         except Exception as err:
             logger.info(f"Failed to add Document {filepath} \n" f"  {err}")
@@ -169,10 +173,10 @@ class PaperDatasetLC(BaseModel):
             return []  # No Object added - return empty list
 
         valid_records = []
-        for i, meta in metadatas:
+        for i, meta in enumerate(metadatas):
             try:
                 if not meta.get("source"):
-                    # Empty or None souce metadata
+                    # Empty or None source metadata
                     raise ValueError(
                         "Paper Dataset not accept texts without specified source in metadata \n"
                         f"Index of problematic record: '{i}'"
@@ -184,8 +188,7 @@ class PaperDatasetLC(BaseModel):
                 valid_records.append(True)
 
             except ValueError as err:
-                # TODO: MSG
-                logger.info()
+                logger.info(err)
                 valid_records.append(False)
 
                 if not skip_invalid:
@@ -390,7 +393,7 @@ class PaperDatasetLC(BaseModel):
             LLM response
 
         """
-        llm = llm or OpenAI(temperature=0)
+        llm = llm or OpenAI(temperature=0, openai_api_key=openai.api_key)
 
         chain = RetrievalQA.from_chain_type(
             llm, retriever=self._db.as_retriever(), **kwargs
@@ -414,7 +417,7 @@ class PaperDatasetLC(BaseModel):
             Dictionary containing response and relevant source documents
 
         """
-        llm = llm or OpenAI(temperature=0)
+        llm = llm or OpenAI(temperature=0, openai_api_key=openai.api_key)
         chain = RetrievalQAWithSourcesChain.from_chain_type(
             llm, retriever=self._db.as_retriever(), **kwargs
         )
@@ -428,6 +431,14 @@ class PaperDatasetLC(BaseModel):
     # def filter_by_categories(self, category: Union[Tuple[str], str]):
     # TODO:
     #     pass
+
+    def identify_features(self, llm: Optional[BaseLanguageModel] = None, limit_pages: Optional[int] = None, ):
+        # TODO: loop over docs and add features and other keys identified by LM
+        # TODO: limit_pages - analyze only 'n' first pages and add keys to whole
+        # TODO: skip already added in metadata
+        # TODO: Think about extracting 'Abstract' and "Results" to analyze
+        # TODO: Maybe scan n_pages after "Abstract" and after "Results"?
+        pass
 
 
 class PaperDataset:
