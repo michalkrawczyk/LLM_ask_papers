@@ -1,16 +1,13 @@
 import pytest
 import os
+from shutil import rmtree
 from pathlib import Path
-# TODO: source pdf for testing add functions
 # TODO: test all add functions
 # TODO: test similarity search
 # TODO: test llm search?
 
 from datasets import PaperDatasetLC
-# import openai
-# from langchain.embeddings.openai import OpenAIEmbeddings
-# from langchain.vectorstores import Chroma
-ROOT_PATH = Path(__file__).resolve().parent.parent.parent
+ROOT_PATH = Path(__file__).resolve().parents[2]
 
 # def test_sample_files_exist():
 #     """ Check if needed samples for dir exists"""
@@ -19,18 +16,20 @@ ROOT_PATH = Path(__file__).resolve().parent.parent.parent
 
 
 def test_add_documents():
+    # test_chroma_path = ROOT_PATH / "datasets/tests/.chroma"
+    # if test_chroma_path.exists():
+    #     rmtree(str(test_chroma_path))
+
     dataset = PaperDatasetLC()
-    doc_id = dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
+    dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
+
     sample_text = ["Lorem impsum something something", "Some Text"]
     sample_metas = [{"source": "sth"}, {"other": "sth"}]
-    other_ids = dataset.add_texts(sample_text, sample_metas, skip_invalid=True)
+    dataset.add_texts(sample_text, sample_metas, skip_invalid=True)
 
-    dataset.
-    # print(doc_id)
-    print(other_ids)
-    print(dataset.similarity_search("Lorem"))
-
-    print(dataset.list_of_papers())
+    stored_docs = dataset.list_papers_by_uuid()
+    assert len(stored_docs) == 6    # 5 from pdf + one text
+    assert any(name == "sth" for _, name in stored_docs)
 
 # def test_search():
 #     dataset = PaperDatasetLC()
