@@ -19,6 +19,7 @@ import openai
 from pydantic import BaseModel, root_validator
 from tqdm import tqdm
 
+from enum import Enum
 from itertools import compress
 import logging
 import os
@@ -32,8 +33,10 @@ from typing import List, Union, Tuple, Any, Dict, Optional, Iterable
 # TODO: Consistant Import Libraries
 # TODO: Validator?
 # TODO: move db to validator (Initialize when not passed, with default setting?
+# TODO: Rewrite add_pdf to multiple pdfs?
 
 # TODO: (Optional) fix get() in langchain, to accepts also 'where'
+# ..note ::
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +44,15 @@ logger = logging.getLogger(__name__)
 def _get_document_name(document: Document):
     """Get name of document (Title or source)"""
     if document.metadata:
-        name = document.metadata.get("title") \
-            or document.metadata.get("source") \
-            or document.metadata.get("file_path")
+        title = document.metadata.get("title")
+        name = None
 
-        if name:
-            return name
+        if not title or title == "Unknown Text":
+            name = document.metadata.get("source") \
+                   or document.metadata.get("file_path")
+
+        if name or title:
+            return name or title
 
     return "Unknown"
 
@@ -54,6 +60,13 @@ def _get_document_name(document: Document):
 def get_document_info(document: Document):
     """Get document metadata (info)"""
     return document.metadata
+
+
+class SearchType(Enum):
+    """ Search Type Enum for VectorStore.search()"""
+    # TODO: Delete if restrict only Chroma in _db
+    MMR = "mmr"
+    SIMILARITY = "similarity"
 
 
 class PaperDatasetLC(BaseModel):
@@ -173,7 +186,7 @@ class PaperDatasetLC(BaseModel):
             return []  # No Object added - return empty list
 
         valid_records = []
-        for i, meta in enumerate(metadatas):
+        for i, (text, meta) in enumerate(zip(texts, metadatas)):
             try:
                 if not meta.get("source"):
                     # Empty or None source metadata
@@ -185,11 +198,10 @@ class PaperDatasetLC(BaseModel):
                 if not meta.get("title"):
                     meta["title"] = "Unknown Text"
 
-                valid_records.append(True)
+                valid_records.append(Document(page_content=text, metadata=meta))
 
             except ValueError as err:
                 logger.info(err)
-                valid_records.append(False)
 
                 if not skip_invalid:
                     logger.info(
@@ -198,12 +210,9 @@ class PaperDatasetLC(BaseModel):
                     return []  # No Object added - return empty list
 
             try:
-                doc_uuids = self._db.add_texts(
-                    texts=compress(texts, valid_records),
-                    metadatas=compress(metadatas, valid_records),
-                )
+                doc_uuids = self._db.add_documents(valid_records)
                 self._papers.update(
-                    {uid: doc for uid, doc in zip(doc_uuids, metadatas)}
+                    {uid: doc for uid, doc in zip(doc_uuids, valid_records)}
                 )
 
                 return doc_uuids
@@ -289,6 +298,10 @@ class PaperDatasetLC(BaseModel):
     #     #TODO
     #     pass
 
+    # def add_youtube_video(self, url: str) -> List[str]:
+    #     #TODO
+    #     raise NotImplementedError()
+
     def list_of_papers(self, regex_filter: Optional[str] = None) -> List[str]:
         """List of papers stored in vector database"""
         if regex_filter:
@@ -320,6 +333,7 @@ class PaperDatasetLC(BaseModel):
 
     def similarity_search(
             self, query: str, n_results: int = 3,
+            search_type: SearchType = SearchType.MMR,
             filter: Optional[Dict[str, str]] = None
     ) -> List[Document]:
         """Search by similarity of embeddings
@@ -330,6 +344,10 @@ class PaperDatasetLC(BaseModel):
             Search Query
         n_results: int
             Limit results to 'n' documents
+        search_type: SearchType
+            Type of search:
+            - SearchType.MMR for max relevance search
+            - SearchType.SIMILARITY for similarity search
         filter: Optional[Dict[str, str]]
             Optional filters for database (If Chroma)
 
@@ -341,10 +359,11 @@ class PaperDatasetLC(BaseModel):
         """
         if filter and not isinstance(self._db, Chroma):
             logger.warning(
-                "Filter option was not tested for other vector storages and may not work with other databases than Chroma"
+                "Filter option was not tested for other vector storages"
+                " and may not work with other databases than Chroma"
             )
 
-        return self._db.similarity_search(query=query, k=n_results, filter=filter)
+        return self._db.search(query=query, search_type=search_type.value, k=n_results, filter=filter)
 
     def similiraty_search_with_scores(
             self, query: str, n_results: int = 3,
