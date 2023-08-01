@@ -1,10 +1,10 @@
 from arxiv_utils import (
-    download_paper_from_arxiv,
-    download_recent_papers_by_querry,
+    # download_paper_from_arxiv,
+    # download_recent_papers_by_querry,
     ExtendedArxivRetriever,
-    PaperData,
+    # PaperData,
 )
-from gpt_core import get_description_json
+# from gpt_core import get_description_json
 
 from langchain.base_language import BaseLanguageModel
 from langchain.chains.retrieval_qa.base import RetrievalQA
@@ -16,27 +16,18 @@ from langchain.schema import Document
 from langchain.vectorstores import Chroma, VectorStore
 import openai
 
-from pydantic import BaseModel, root_validator
-from tqdm import tqdm
+# from pydantic import BaseModel, root_validator
+# from tqdm import tqdm
 
 from enum import Enum
-from itertools import compress
 import logging
 import os
 import re
-from typing import List, Union, Tuple, Any, Dict, Optional, Iterable
+from typing import (
+    Any, Dict, List,
+    # Union,
+    Tuple,  Optional, Iterable)
 
-# TODO: Chroma db in validator or stale? - Add to validator and mark db as Optional[VectorStore] (to add in validator or post_init)
-# TODO: Remove paper?
-# TODO: Langchain SummaryChain?
-# TODO: Summary from whole paper and by similarity search (with check if embedding are present)
-# TODO: Consistant Import Libraries
-# TODO: Validator?
-# TODO: move db to validator (Initialize when not passed, with default setting?
-# TODO: Rewrite add_pdf to multiple pdfs?
-
-# TODO: (Optional) fix get() in langchain, to accepts also 'where'
-# ..note ::
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +48,6 @@ def _get_document_name(document: Document):
     return "Unknown"
 
 
-def get_document_info(document: Document):
-    """Get document metadata (info)"""
-    return document.metadata
-
-
 class SearchType(Enum):
     """ Search Type Enum for VectorStore.search()"""
     # TODO: Delete if restrict only Chroma in _db
@@ -69,16 +55,34 @@ class SearchType(Enum):
     SIMILARITY = "similarity"
 
 
-class PaperDatasetLC(BaseModel):
-    _db: VectorStore = Chroma(embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key))
+class PaperDatasetLC:
+    _db: Optional[VectorStore] = None
     _papers: Dict = dict()  # For listing included documents, retrieve whole documents
+    _default_llm: Optional[BaseLanguageModel] = None
 
     # Also because of limits made from langchain on get() function
 
-    @root_validator()
-    def validate_dataset(cls, values: Dict) -> Dict:
-        # TODO:Call db functions for check if implemented functionalities
-        return values
+    def __init__(self, db: Optional[VectorStore] = None,
+                 llm: Optional[BaseLanguageModel] = None):
+        if not db:
+            if llm:
+                raise ValueError("PaperDatasetLC cannot be instantiated "
+                                 "if only llm model is given,"
+                                 " without proper embeddings")
+
+            logger.info("Dataset with not specified db"
+                        " - using Chroma with OpenAI embeddings")
+            self._db = Chroma(embedding_function=OpenAIEmbeddings(
+                openai_api_key=openai.api_key))
+            self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
+
+        else:
+            self._db = db
+            self._default_llm = llm
+
+            if self._default_llm:
+                logger.warning("LLM model not provided -"
+                               " search functions requiring it will not be available")
 
     def add_document(
             self, document: Document, metadata: Optional[Dict] = None
@@ -412,7 +416,9 @@ class PaperDatasetLC(BaseModel):
             LLM response
 
         """
-        llm = llm or OpenAI(temperature=0, openai_api_key=openai.api_key)
+        llm = llm or self._default_llm
+        if not llm:
+            raise RuntimeError("LLM not provided")
 
         chain = RetrievalQA.from_chain_type(
             llm, retriever=self._db.as_retriever(), **kwargs
@@ -436,7 +442,10 @@ class PaperDatasetLC(BaseModel):
             Dictionary containing response and relevant source documents
 
         """
-        llm = llm or OpenAI(temperature=0, openai_api_key=openai.api_key)
+        llm = llm or self._default_llm
+        if not llm:
+            raise RuntimeError("LLM not provided")
+
         chain = RetrievalQAWithSourcesChain.from_chain_type(
             llm, retriever=self._db.as_retriever(), **kwargs
         )
@@ -450,6 +459,9 @@ class PaperDatasetLC(BaseModel):
     # def filter_by_categories(self, category: Union[Tuple[str], str]):
     # TODO:
     #     pass
+    def get(self):
+        if isinstance(self._db, Chroma):
+            return self._db.get()
 
     def identify_features(self, llm: Optional[BaseLanguageModel] = None, limit_pages: Optional[int] = None, ):
         # TODO: loop over docs and add features and other keys identified by LM
@@ -459,223 +471,228 @@ class PaperDatasetLC(BaseModel):
         # TODO: Maybe scan n_pages after "Abstract" and after "Results"?
         pass
 
+    @staticmethod
+    def get_document_info(document: Document):
+        """Get document metadata (info)"""
+        return document.metadata
 
-class PaperDataset:
-    _papers = dict()
 
-    def add_papers_by_id(self, id_list: List[str], output_dir: str = "."):
-        """Download and add to dataset papers from Arxiv by ID
-
-        Parameters
-        ----------
-        id_list: List[str]
-            List with ids for each paper to download
-
-        output_dir: str
-            Directory where documents will be saved
-
-        Returns
-        -------
-        self
-            self obejct for chaining
-
-        """
-        downloaded_papers = set(download_paper_from_arxiv(id_list, output_dir))
-        self._add_papers_by_filepath(downloaded_papers)
-
-        return self
-
-    def search_and_add_papers(
-            self, search_query: str, limit: float = 10.0, output_dir: str = "."
-    ):
-        """
-        Download and add to dataset recent papers from Arxiv by results from search quarry
-        Parameters
-        ----------
-        search_query: str
-            Search query (e.g. 'Deep Learning')
-
-        limit: float
-            Maximum number of papers to download.
-
-        output_dir: str
-            Directory where documents will be saved
-
-        Returns
-        -------
-        self
-            self obejct for chaining
-
-        """
-
-        downloaded_papers = set(
-            download_recent_papers_by_querry(search_query, limit, output_dir)
-        )
-        self._add_papers_by_filepath(downloaded_papers)
-
-        return self
-
-    def add_paper(self, filepath: str, reload_if_exist: bool = False):
-        """Add single paper with summary to dataset
-
-        Parameters
-        ----------
-        filepath: str
-            Path to file
-
-        reload_if_exist: bool
-            If True - overwrites paper data in dataset if exist
-
-        Returns
-        -------
-        self
-            self obejct for chaining
-
-        """
-        if os.path.basename(filepath) in self._papers and not reload_if_exist:
-            # Don't add already existing file if not required
-            return
-
-        try:
-            paper = PaperData(filepath)
-            summary = get_description_json(paper)
-            summary["filepath"] = filepath
-            # summary["New Features"] = summary["New Features"].split(',')
-
-            self._papers[os.path.basename(filepath)] = summary
-
-        except Exception as err:
-            logging.error(f"Failed to update: {filepath} - {err}")
-
-        return self
-
-    def _add_papers_by_filepath(self, files: set):
-        """Update dataset dictionary with new files and their summaries.
-
-        Parameters
-        ----------
-        files: set
-            files to add
-
-        """
-        files_to_add = set(os.path.basename(f) for f in files).difference(
-            set(self._papers.keys())
-        )
-        files_to_add = set(f for f in files if os.path.basename(f) in files_to_add)
-
-        for f_path in tqdm(files_to_add, desc="Updating list of papers"):
-            self.add_paper(f_path)
-
-    def refresh_summary(self):
-        """Reload file summaries in dataset dictionary, overwriting existing data"""
-        for filename, data in self._papers.items():
-            f_path = data.get("filepath", "")
-
-            try:
-                paper = PaperData(f_path)
-                summary = get_description_json(paper)
-
-                for key, val in summary.items():
-                    data[key] = val
-
-            except Exception as err:
-                logging.error(f"Failed to update: {filename} - {err}")
-
-    @property
-    def list_of_papers(self):
-        return self._papers.keys()
-
-    @property
-    def list_data_fields(self):
-        data_fields = set()
-
-        for data in self._papers.values():
-            data_fields.update(data.keys())
-
-        return list(data_fields)
-
-    def list_values_by_field(self, search_key: str):
-        values = set()
-
-        for data in self._papers.values():
-            value = data.get(search_key, "")
-
-            if value:
-                values.add(value)
-
-        return values
-
-    @property
-    def list_new_features(self):
-        return self.list_values_by_field("New Features")
-
-    def search_by_field_value(self, field: str, value: str, regex_search: bool = True):
-        """Search papers with specific value in given field
-
-        Parameters
-        ----------
-        field: str
-            Search Field in papers (e.g. "New Features")
-        value: str
-            Searched Value
-        regex_search: str
-            If true - value is treaten as regex and may be not exact match
-            Else - value must be exact match
-
-        Returns
-        -------
-        found: dict
-            Dictionary containing all papers matching searched value
-
-        """
-        if regex_search:
-            found = {
-                paper: data
-                for paper, data in self._papers.items()
-                if re.search(value, data.get(field, ""))
-            }
-        else:
-            found = {
-                paper: data
-                for paper, data in self._papers.items()
-                if data.get(field, "") == value
-            }
-
-        if not found:
-            logging.warning(
-                f"Values for field: '{field}' not found "
-                f"- probably field not exist in dataset"
-            )
-
-        return found
-
-    def get_paper_by_filename(self, filename):
-        """Search Paper Data by filename"""
-        return self._papers.get(filename, None)
-
-    def filter_by_categories(self, category: Union[Tuple[str], str]):
-        """Filter Papers by Category (e.g. Object Detection)
-
-        Parameters
-        ----------
-        category: Union[Tuple[str], str]
-            One String or tuple with strings with categories to search
-
-        Returns
-        -------
-        found: dict
-            Dictionary containing all papers matching searched categories
-
-        """
-        if isinstance(category, str):
-            categories = tuple(category.lower())
-        else:
-            categories = tuple(c.lower() for c in category)
-
-        found = {
-            paper: data
-            for paper, data in self._papers.items()
-            if data.get("Category", "").lower() in categories
-        }
-
-        return found
+# class PaperDataset:
+#     _papers = dict()
+#
+#     def add_papers_by_id(self, id_list: List[str], output_dir: str = "."):
+#         """Download and add to dataset papers from Arxiv by ID
+#
+#         Parameters
+#         ----------
+#         id_list: List[str]
+#             List with ids for each paper to download
+#
+#         output_dir: str
+#             Directory where documents will be saved
+#
+#         Returns
+#         -------
+#         self
+#             self obejct for chaining
+#
+#         """
+#         downloaded_papers = set(download_paper_from_arxiv(id_list, output_dir))
+#         self._add_papers_by_filepath(downloaded_papers)
+#
+#         return self
+#
+#     def search_and_add_papers(
+#             self, search_query: str, limit: float = 10.0, output_dir: str = "."
+#     ):
+#         """
+#         Download and add to dataset recent papers from Arxiv by results from search quarry
+#         Parameters
+#         ----------
+#         search_query: str
+#             Search query (e.g. 'Deep Learning')
+#
+#         limit: float
+#             Maximum number of papers to download.
+#
+#         output_dir: str
+#             Directory where documents will be saved
+#
+#         Returns
+#         -------
+#         self
+#             self obejct for chaining
+#
+#         """
+#
+#         downloaded_papers = set(
+#             download_recent_papers_by_querry(search_query, limit, output_dir)
+#         )
+#         self._add_papers_by_filepath(downloaded_papers)
+#
+#         return self
+#
+#     def add_paper(self, filepath: str, reload_if_exist: bool = False):
+#         """Add single paper with summary to dataset
+#
+#         Parameters
+#         ----------
+#         filepath: str
+#             Path to file
+#
+#         reload_if_exist: bool
+#             If True - overwrites paper data in dataset if exist
+#
+#         Returns
+#         -------
+#         self
+#             self obejct for chaining
+#
+#         """
+#         if os.path.basename(filepath) in self._papers and not reload_if_exist:
+#             # Don't add already existing file if not required
+#             return
+#
+#         try:
+#             paper = PaperData(filepath)
+#             summary = get_description_json(paper)
+#             summary["filepath"] = filepath
+#             # summary["New Features"] = summary["New Features"].split(',')
+#
+#             self._papers[os.path.basename(filepath)] = summary
+#
+#         except Exception as err:
+#             logging.error(f"Failed to update: {filepath} - {err}")
+#
+#         return self
+#
+#     def _add_papers_by_filepath(self, files: set):
+#         """Update dataset dictionary with new files and their summaries.
+#
+#         Parameters
+#         ----------
+#         files: set
+#             files to add
+#
+#         """
+#         files_to_add = set(os.path.basename(f) for f in files).difference(
+#             set(self._papers.keys())
+#         )
+#         files_to_add = set(f for f in files if os.path.basename(f) in files_to_add)
+#
+#         for f_path in tqdm(files_to_add, desc="Updating list of papers"):
+#             self.add_paper(f_path)
+#
+#     def refresh_summary(self):
+#         """Reload file summaries in dataset dictionary, overwriting existing data"""
+#         for filename, data in self._papers.items():
+#             f_path = data.get("filepath", "")
+#
+#             try:
+#                 paper = PaperData(f_path)
+#                 summary = get_description_json(paper)
+#
+#                 for key, val in summary.items():
+#                     data[key] = val
+#
+#             except Exception as err:
+#                 logging.error(f"Failed to update: {filename} - {err}")
+#
+#     @property
+#     def list_of_papers(self):
+#         return self._papers.keys()
+#
+#     @property
+#     def list_data_fields(self):
+#         data_fields = set()
+#
+#         for data in self._papers.values():
+#             data_fields.update(data.keys())
+#
+#         return list(data_fields)
+#
+#     def list_values_by_field(self, search_key: str):
+#         values = set()
+#
+#         for data in self._papers.values():
+#             value = data.get(search_key, "")
+#
+#             if value:
+#                 values.add(value)
+#
+#         return values
+#
+#     @property
+#     def list_new_features(self):
+#         return self.list_values_by_field("New Features")
+#
+#     def search_by_field_value(self, field: str, value: str, regex_search: bool = True):
+#         """Search papers with specific value in given field
+#
+#         Parameters
+#         ----------
+#         field: str
+#             Search Field in papers (e.g. "New Features")
+#         value: str
+#             Searched Value
+#         regex_search: str
+#             If true - value is treaten as regex and may be not exact match
+#             Else - value must be exact match
+#
+#         Returns
+#         -------
+#         found: dict
+#             Dictionary containing all papers matching searched value
+#
+#         """
+#         if regex_search:
+#             found = {
+#                 paper: data
+#                 for paper, data in self._papers.items()
+#                 if re.search(value, data.get(field, ""))
+#             }
+#         else:
+#             found = {
+#                 paper: data
+#                 for paper, data in self._papers.items()
+#                 if data.get(field, "") == value
+#             }
+#
+#         if not found:
+#             logging.warning(
+#                 f"Values for field: '{field}' not found "
+#                 f"- probably field not exist in dataset"
+#             )
+#
+#         return found
+#
+#     def get_paper_by_filename(self, filename):
+#         """Search Paper Data by filename"""
+#         return self._papers.get(filename, None)
+#
+#     def filter_by_categories(self, category: Union[Tuple[str], str]):
+#         """Filter Papers by Category (e.g. Object Detection)
+#
+#         Parameters
+#         ----------
+#         category: Union[Tuple[str], str]
+#             One String or tuple with strings with categories to search
+#
+#         Returns
+#         -------
+#         found: dict
+#             Dictionary containing all papers matching searched categories
+#
+#         """
+#         if isinstance(category, str):
+#             categories = tuple(category.lower())
+#         else:
+#             categories = tuple(c.lower() for c in category)
+#
+#         found = {
+#             paper: data
+#             for paper, data in self._papers.items()
+#             if data.get("Category", "").lower() in categories
+#         }
+#
+#         return found
