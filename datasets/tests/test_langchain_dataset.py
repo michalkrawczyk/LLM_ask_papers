@@ -1,10 +1,11 @@
 import pytest
 import os
-from shutil import rmtree
 from pathlib import Path
 # TODO: test all add functions
-# TODO: test similarity search
 # TODO: test llm search?
+
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.vectorstores import Chroma
 
 from datasets import PaperDatasetLC
 ROOT_PATH = Path(__file__).resolve().parents[2]
@@ -16,11 +17,8 @@ ROOT_PATH = Path(__file__).resolve().parents[2]
 
 
 def test_add_documents():
-    # test_chroma_path = ROOT_PATH / "datasets/tests/.chroma"
-    # if test_chroma_path.exists():
-    #     rmtree(str(test_chroma_path))
-
-    dataset = PaperDatasetLC()
+    embeddings = HuggingFaceEmbeddings()
+    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings))
     dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
 
     sample_text = ["Lorem impsum something something", "Some Text"]
@@ -31,10 +29,17 @@ def test_add_documents():
     assert len(stored_docs) == 6    # 5 from pdf + one text
     assert any(name == "sth" for _, name in stored_docs)
 
+
+#TODO:
 # def test_search():
-#     dataset = PaperDatasetLC()
-#     doc_id = dataset.add_text_file("tests/sample_documents/2302.00386.pdf")
-#     print(doc_id)
+#     dataset = PaperDatasetLC(db=Chroma(embedding_function=HuggingFaceEmbeddings()))
+#     doc1 = dataset.add_papers_by_id(["2301.05586"])
+#     assert len(doc1) > 0
+#     doc2 = dataset.add_documents_by_query(query="yolov7", max_docs=1)
+#
+#     assert len(doc2) > 0
 #     docs = dataset.similarity_search("Results", n_results=2)
+#
 #     assert len(docs) == 2
-#     print(docs[0].metadata)
+
+
