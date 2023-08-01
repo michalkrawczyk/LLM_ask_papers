@@ -196,8 +196,8 @@ class ArxivAPIWrapper2(BaseModel):
             else:
                 extra_metadata = {}
             metadata = {
-
                 "title": result.title,
+                "source": f"[{result.entry_id}] {result.title}",
                 "authors": ", ".join(a.name for a in result.authors),
                 "summary": result.summary,
                 "published": str(result.updated.date()),
