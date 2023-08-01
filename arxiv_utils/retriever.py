@@ -1,5 +1,6 @@
 from typing import List
 
+from langchain.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain.schema import BaseRetriever, Document
 from arxiv import SortCriterion, SortOrder
 from .wrapper import ArxivAPIWrapper2
@@ -11,6 +12,11 @@ class ExtendedArxivRetriever(BaseRetriever, ArxivAPIWrapper2):
     Wraps load() for obtaining documents with
     get_relevant_documents(), get_documents_by_id() and get_filtered_documents_by_query()
     """
+
+    def _get_relevant_documents(self, query: str, *,
+                                run_manager: CallbackManagerForRetrieverRun
+                                ) -> List[Document]:
+        return self.load(query=query)
 
     def get_relevant_documents(self, query: str) -> List[Document]:
         """Get relevant documents by search quarry"""
@@ -45,6 +51,3 @@ class ExtendedArxivRetriever(BaseRetriever, ArxivAPIWrapper2):
         # Restore Settings
         self.sort_docs_by, self.sort_order = current_settings
         return docs
-
-    async def aget_relevant_documents(self, query: str) -> List[Document]:
-        raise NotImplementedError

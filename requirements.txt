@@ -5,7 +5,8 @@ tqdm==4.65.0
 tiktoken==0.4.0
 PyMuPDF==1.22.3
 pydantic==1.10.9
-langchain==0.0.216
+langchain==0.0.249
+sentence-transformers==2.2.2
 
 ## Additional libs used (dev):
 # black==23.3.0
