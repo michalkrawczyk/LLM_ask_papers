@@ -16,7 +16,6 @@ from langchain.schema import Document
 from langchain.vectorstores import Chroma, VectorStore
 import openai
 
-# from pydantic import BaseModel, root_validator
 # from tqdm import tqdm
 
 from enum import Enum
@@ -451,17 +450,21 @@ class PaperDatasetLC:
         )
         return chain({chain.question_key: query})
 
-    # @property
-    # def list_new_features(self):
-    # TODO:
-    #     pass
+    def list_containing_field(self, field_name: str, include: Optional[List[str]] = None):
+        # TODO: Docs
+        return self.get(where={field_name: {"$ne": ""}},
+                        include=include)
+    @property
+    def list_new_features(self):
+        # TODO: Should be added here identify_features with reload param?
+        return self.get(where={"new_features": {"$ne": ""}})
 
     # def filter_by_categories(self, category: Union[Tuple[str], str]):
     # TODO:
     #     pass
-    def get(self):
+    def get(self, **kwargs):
         if isinstance(self._db, Chroma):
-            return self._db.get()
+            return self._db.get(**kwargs)
 
     def identify_features(self, llm: Optional[BaseLanguageModel] = None, limit_pages: Optional[int] = None, ):
         # TODO: loop over docs and add features and other keys identified by LM
@@ -469,12 +472,20 @@ class PaperDatasetLC:
         # TODO: skip already added in metadata
         # TODO: Think about extracting 'Abstract' and "Results" to analyze
         # TODO: Maybe scan n_pages after "Abstract" and after "Results"?
+
+        # TODO: 17.08
+        # TODO: Idea: Keywords can be reduced without llm - just string/set filter
         pass
 
     @staticmethod
     def get_document_info(document: Document):
         """Get document metadata (info)"""
         return document.metadata
+
+    def summarize_paper(self, paper_name):
+        #TODO: Summarize with LLMChain and map reduce
+        #TODO: Idea: Keywords can be reduced without llm - just string/set filter
+        pass
 
 
 # class PaperDataset:
