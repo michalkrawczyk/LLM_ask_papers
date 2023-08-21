@@ -7,3 +7,4 @@ PyMuPDF==1.22.3
 pydantic==1.10.9
 langchain==0.0.249
 sentence-transformers==2.2.2
+chromadb==0.3.26
