@@ -1,14 +1,9 @@
 openai==0.27.6
 arxiv==1.4.7
-pyyaml==6.0
+PyYAML==6.0
 tqdm==4.65.0
 tiktoken==0.4.0
 PyMuPDF==1.22.3
 pydantic==1.10.9
 langchain==0.0.249
 sentence-transformers==2.2.2
-
-## Additional libs used (dev):
-# black==23.3.0
-# pytest==7.4.0
-# chromadb==0.3.26 #?
