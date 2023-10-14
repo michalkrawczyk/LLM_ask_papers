@@ -5,7 +5,7 @@ from typing import Dict
 from dataclasses import dataclass, field
 
 from langchain.prompts import load_prompt
-from langchain.schema.prompt_template import BasePromptTemplate
+from langchain.schema import BasePromptTemplate
 
 # ROOT_PATH = Path(__file__).resolve().parent.parent
 logger = logging.getLogger(__name__)
