@@ -47,3 +47,9 @@ class PromptHolder:
 
     def __getitem__(self, name: str) -> BasePromptTemplate:
         return self.PROMPTS[name]
+
+    def __contains__(self, item: str) -> bool:
+        return item in self.PROMPTS.keys()
+
+    def get(self, name: str) -> BasePromptTemplate:
+        return self.PROMPTS.get(name, None)
