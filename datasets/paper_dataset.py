@@ -25,10 +25,7 @@ from templates import ShortInfoSummary, DEFAULT_PROMPT_REGISTER, PromptHolder
 logger = logging.getLogger(__name__)
 
 """ TODO:
-list_papers_by_uuid - test
-search_by_name (title, source, file_path)
-search_by_field
-get_by_id
+test search functions
 summarize_paper - test + prompt
 add_page (305 line)
 add_youtube_summary (310 line)
@@ -40,7 +37,7 @@ add_youtube_summary (310 line)
  - add mising docs
 - TensorRT acceleration
 - method to load dataset with variables
-- normalidentify summary for page and one refined for whole paper?
+- normally identify summary for page and one refined for whole paper?
 """
 
 
@@ -378,6 +375,27 @@ class PaperDatasetLC:
         if isinstance(self._db, Chroma):
             return self._db.get(**kwargs)
 
+    def get_by_id(self, ids: Union[str, Iterable[str]], include: Optional[List[str]] = None) -> Dict[str, Any]:
+        """ Get documents by id
+
+        Parameters
+        ----------
+        ids: Union[str, Iterable[str]]
+            Ids of documents to get
+        include : Optional[List[str]]
+            List of fields to include in result.
+            Can contain `"embeddings"`, `"metadatas"`, `"documents"`.
+            Ids are always included.
+            Defaults to `["metadatas", "documents"]`
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary of documents with included keys
+
+        """
+        return self.get(ids=ids, include=include)
+
     def get_containing_field(self, field_name: str, include: Optional[List[str]] = None) -> Dict[str, Any]:
         """ Get documents with non-empty given field
 
@@ -580,11 +598,104 @@ class PaperDatasetLC:
             # Update document in database
             self._db.update_document(doc_id, Document(page_content=doc_text, metadata=metadata))
 
-    @staticmethod
-    def get_document_info(document: Document):
-        """Get document metadata (info)"""
-        #TODO: Needed?
-        return document.metadata
+    # @staticmethod
+    # def get_document_info(document: Document):
+    #     """Get document metadata (info)"""
+    #     #TODO: Needed?
+    #     return document.metadata
+
+    def search_by_field(self, field_name: str, search_value: str, regex_match: bool = False,
+                        include: Optional[List[str]] = None) -> Dict[str, List[Any]]:
+        """ Search documents by value in given field
+
+        Parameters
+        ----------
+        field_name: str
+            Field name to search
+        search_value: str
+            Value to search
+        exact_match:
+            If True - search value must exact match value in field.
+            This is default behavior since it is faster.
+        include: Optional[List[str]]
+            List of fields to include in result.
+            Can contain `"embeddings"`, `"metadatas"`, `"documents"`.
+            Ids are always included.
+            Defaults to `["metadatas", "documents"]`
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary of documents with included keys
+
+        """
+
+        if not regex_match:
+            return self.get(where={field_name: {"$eq": search_value}}, include=include)
+
+        # Double get from db due to Chroma not supporting regex search
+        # and lower memory usage with filtering only by metadata first
+        documents = self.get_containing_field(field_name=field_name, include=["metadatas"])
+        found_ids = []
+
+        for i, doc_meta in enumerate(tqdm(documents["metadatas"], desc="Searching documents")):
+
+            if search_value in doc_meta[field_name]:
+                found_ids.append(documents["ids"][i])
+
+        return self.get(ids=found_ids, include=include)
+
+    def search_by_name(self, search_value: str, regex_match: bool = False,
+                       include: Optional[List[str]] = None) -> Dict[str, List[Any]]:
+        """ Search documents by name (title or source)
+
+        Parameters
+        ----------
+        search_value: str
+            Name to search (title or source)
+        regex_match:
+            If True - Search as regex: 'name' is treated as regex pattern.
+            This option is slower since
+        include: Optional[List[str]]
+            List of fields to include in result.
+            Can contain `"embeddings"`, `"metadatas"`, `"documents"`.
+            Ids are always included.
+            Defaults to `["metadatas", "documents"]`
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary of documents with included keys
+
+        """
+        if not regex_match:
+            query = {
+                "$or": [
+                    {
+                        "title": {
+                            "$eq": search_value
+                        }
+                    },
+                    {
+                        "source": {
+                            "$eq": search_value
+                        }
+                    }
+                ]
+            }
+            return self.get(where=query, include=include)
+
+        # Double get from db due to Chroma not supporting regex search
+        # and lower memory usage with filtering only by metadata first
+
+        documents = self.get(include=['metadatas'])
+        found_ids = []
+
+        for i, doc_meta in enumerate(tqdm(documents["metadatas"], desc="Searching documents")):
+            if re.match(search_value, doc_meta["title"]) or re.match(search_value, doc_meta["source"]):
+                found_ids.append(documents["ids"][i])
+
+        return self.get(ids=found_ids, include=include)
 
     def summarize_paper(self, paper_name):
         docs = self.get(where={"title": paper_name})["documents"]
