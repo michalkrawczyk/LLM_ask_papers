@@ -25,6 +25,7 @@ from templates import ShortInfoSummary, DEFAULT_PROMPT_REGISTER, PromptHolder
 logger = logging.getLogger(__name__)
 
 """ TODO:
+
 test search functions
 summarize_paper - test + prompt
 add_page (305 line)
@@ -515,9 +516,12 @@ class PaperDatasetLC:
 
         Parameters
         ----------
-        query
-        llm
-        kwargs
+        query: str
+            Search Query
+        llm: Optional[BaseLanguageModel]
+            LLM model to use. If not provided default model is used
+        kwargs: Any
+            Keyword arguments for 'RetrievalQAWithSourcesChain.from_chain_type' method
 
         Returns
         -------
