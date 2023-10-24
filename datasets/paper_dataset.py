@@ -30,6 +30,7 @@ test search functions
 summarize_paper - test + prompt
 add_page (305 line)
 add_youtube_summary (310 line)
+list_available_fields - test
 
 - For single paper dataset should be used only single embedding and llm
 - Nougat reader (example on Hugging Face)
@@ -59,7 +60,7 @@ def _get_document_name(document: Union[Document, Dict]) -> str:
             name = os.path.basename(name)
 
         if name or title:
-            return f"{name or title} - page: {meta.get('page_number', 0)}"
+            return f"{name or title} - page: {meta.get('page', 0)}"
 
     return "Unknown"
 
@@ -335,11 +336,25 @@ class PaperDatasetLC:
     #     #TODO
     #     raise NotImplementedError()
 
-    def list_of_documents(self, regex_filter: Optional[str] = None) -> List[Tuple[str, ...]]:
-        """List of papers stored in vector database"""
+    def unique_list_of_documents(self, regex_filter: Optional[str] = None) -> List[Tuple[str, ...]]:
+        """ List of papers stored in vector database to tuple of (title, source, file_path).
+        List is shortened to not contain next pages of same document.
+
+
+        Parameters
+        ----------
+        regex_filter: Optional[str]
+            Optional Regex pattern to filter documents by title, source or file_path
+
+        Returns
+        -------
+        List[Tuple[str, ...]]
+            List of tuples (title, source, file_path) of unique documents
+
+        """
         document_set = set()
 
-        for meta in tqdm(self.get(include=["metadatas"])["metadatas"], desc="Listing documents matching regular expression"):
+        for meta in tqdm(self.get(include=["metadatas"])["metadatas"], desc="Listing documents"):
             fields = [meta.get(field, "") for field in ["title", "source", "file_path"]]
 
             if not regex_filter or any(re.match(regex_filter, field) for field in fields):
@@ -354,7 +369,20 @@ class PaperDatasetLC:
 
         return [(doc_id, doc) for doc_id, doc in zip(documents["ids"], map(_get_document_name, documents["metadatas"]))]
 
-    def list_new_features(self, store_result: bool = True):
+    def list_new_features(self, store_result: bool = True) -> List[str]:
+        """  List of all new features detected in documents
+
+        Parameters
+        ----------
+        store_result: bool
+            If True - Store result in class variable for faster access
+
+        Returns
+        -------
+        List[str]
+            List of all new features detected in documents
+
+        """
         if self._feature_list:
             return self._feature_list
 
@@ -372,7 +400,40 @@ class PaperDatasetLC:
 
         return feature_list
 
-    def get(self, **kwargs):
+    def list_available_fields(self) -> List[str]:
+        """ List of all available metadata fields in documents """
+        features = set()
+        for metadata in tqdm(self.get(include=["metadatas"])["metadatas"], desc="Listing available fields"):
+            features.update(metadata.keys())
+
+        return list(features)
+
+    def get(self, **kwargs) -> Dict[str, Any]:
+        """
+
+        Parameters
+        ----------
+        kwargs: Any
+         Possible arguments:
+            ids: The ids of the embeddings to get. Optional.
+            where: A Where type dict used to filter results by.
+                   E.g. `{"color" : "red", "price": 4.20}`. Optional.
+            limit: The number of documents to return. Optional.
+            offset: The offset to start returning results from.
+                    Useful for paging results with limit. Optional.
+            where_document: A WhereDocument type dict used to filter by the documents.
+                            E.g. `{$contains: {"text": "hello"}}`. Optional.
+            include: A list of what to include in the results.
+                     Can contain `"embeddings"`, `"metadatas"`, `"documents"`.
+                     Ids are always included.
+                     Defaults to `["metadatas", "documents"]`. Optional.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary of documents with included keys
+
+        """
         if isinstance(self._db, Chroma):
             return self._db.get(**kwargs)
 
@@ -462,8 +523,11 @@ class PaperDatasetLC:
         Parameters
         ----------
         query: str
+            Search Query
         n_results: int
+            Limit results to 'n' documents
         score_threshold: float
+            Optional score threshold for filtering results
 
         Returns
         -------
@@ -618,9 +682,8 @@ class PaperDatasetLC:
             Field name to search
         search_value: str
             Value to search
-        exact_match:
-            If True - search value must exact match value in field.
-            This is default behavior since it is faster.
+        regex_match:
+            If True - Search as regex: 'name' is treated as regex pattern.
         include: Optional[List[str]]
             List of fields to include in result.
             Can contain `"embeddings"`, `"metadatas"`, `"documents"`.
@@ -659,7 +722,6 @@ class PaperDatasetLC:
             Name to search (title or source)
         regex_match:
             If True - Search as regex: 'name' is treated as regex pattern.
-            This option is slower since
         include: Optional[List[str]]
             List of fields to include in result.
             Can contain `"embeddings"`, `"metadatas"`, `"documents"`.
