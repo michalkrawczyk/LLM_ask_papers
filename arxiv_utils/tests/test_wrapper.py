@@ -1,7 +1,7 @@
 import pytest
 from arxiv_utils import ArxivAPIWrapper2
 
-#TODO: Ignore for Arxiv HTTP exception?
+# TODO: Ignore for Arxiv HTTP exception?
 
 
 def test_download():

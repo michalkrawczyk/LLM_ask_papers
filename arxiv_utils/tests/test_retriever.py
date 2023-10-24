@@ -18,4 +18,3 @@ def test_download(download_type):
     else:
         docs = retriever.get_filtered_documents_by_query(paper_id, query)
         assert len(docs) == 1
-
