@@ -79,6 +79,7 @@ class PaperDatasetLC:
     _prompts: PromptHolder = DEFAULT_PROMPT_REGISTER
 
     _feature_list: Optional[List[str]] = None   # meta private
+    max_num_words = 1500    # TODO: method to take from llm and setters
 
     def __init__(self, db: Optional[VectorStore] = None,
                  llm: Optional[BaseLanguageModel] = None):
@@ -114,6 +115,34 @@ class PaperDatasetLC:
                 logger.warning(f"Prompt {prompt_name} not defined -"
                                f" Some functions requiring it will not be available")
 
+    def _split_document_by_length(self, document: Document) -> List[Document]:
+        """Split document by max_num_words"""
+        regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
+
+        word_count = len(document.page_content.split(' '))
+
+        if word_count > self.max_num_words:
+            documents = []
+            # Search for sections
+            regex_matches = re.findall(regex, document.page_content)
+
+            if (len(regex_matches) + 1) >= word_count / self.max_num_words:
+                # Split by found sections
+                for match, text in zip(regex_matches, re.split(regex, document.page_content)):
+                    documents.append(Document(page_content=match + ' ' + text, metadata=document.metadata))
+            else:
+                words = document.page_content.split(' ')
+                last_index = 0
+                for i in range(1, len(words), self.max_num_words):
+                    documents.append(
+                        Document(page_content=' '.join(words[last_index:i * self.max_num_words]),
+                                 metadata=document.metadata))
+                    last_index = i
+        else:
+            documents = [document]
+
+        return documents
+
     def add_document(
             self, document: Document, metadata: Optional[Dict] = None
     ) -> List[str]:
@@ -138,9 +167,11 @@ class PaperDatasetLC:
                     # Add missing data
                     document.metadata[key] = metadata["key"]
 
+        documents = self._split_document_by_length(document)
+
         try:
-            doc_uuids = self._db.add_documents([document])
-            self._papers[doc_uuids[0]] = document
+            doc_uuids = self._db.add_documents(documents)
+            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, documents)})
 
             return doc_uuids
 
@@ -172,7 +203,11 @@ class PaperDatasetLC:
             f" for file: {filepath}"
 
         try:
-            data = PyMuPDFLoader(filepath).load()
+            data = []
+
+            for doc in tqdm(PyMuPDFLoader(filepath).load(), desc="Loading pdf pages"):
+                split_docs = self._split_document_by_length(doc)
+                data.extend(split_docs)
 
             if metadata:
                 for page in data:
@@ -218,6 +253,7 @@ class PaperDatasetLC:
         except ValueError as err:
             logger.info(f"Failed to add texts to dataset: {err}")
             return []  # No Object added - return empty list
+        # TODO: split texts by max_num_words
 
         valid_records = []
         for i, (text, meta) in enumerate(zip(texts, metadatas)):
@@ -232,7 +268,9 @@ class PaperDatasetLC:
                 if not meta.get("title"):
                     meta["title"] = "Unknown Text"
 
-                valid_records.append(Document(page_content=text, metadata=meta))
+                valid_records.extend(
+                    self._split_document_by_length(
+                        Document(page_content=text, metadata=meta)))
 
             except ValueError as err:
                 logger.info(err)
@@ -319,7 +357,11 @@ class PaperDatasetLC:
     def add_documents(self, documents: List[Document]) -> List[str]:
         """Add Multiple documents to vector database"""
         try:
-            doc_uuids = self._db.add_documents(documents)
+            splited_documents = []
+            for doc in tqdm(documents, "Splitting documents"):
+                splited_documents.extend(self._split_document_by_length(doc))
+
+            doc_uuids = self._db.add_documents(splited_documents)
             self._papers.update({uid: doc for uid, doc in zip(doc_uuids, documents)})
             return doc_uuids
 
