@@ -2,10 +2,7 @@ from enum import Enum
 import logging
 import os
 import re
-from typing import (
-    Any, Dict, List,
-    Union,
-    Tuple, Optional, Iterable)
+from typing import Any, Dict, List, Union, Tuple, Optional, Iterable
 
 from langchain.base_language import BaseLanguageModel
 from langchain.chains import LLMChain, RetrievalQA, RetrievalQAWithSourcesChain
@@ -34,11 +31,11 @@ list_available_fields - test
 
 - For single paper dataset should be used only single embedding and llm
 - Nougat reader (example on Hugging Face)
-- 56 line
+- update_document_features as universal?
+
 - 
  - add mising docs
-- TensorRT acceleration
-- method to load dataset with variables
+- TensorRT acceleration if possible
 - normally identify summary for page and one refined for whole paper?
 """
 
@@ -55,8 +52,7 @@ def _get_document_name(document: Union[Document, Dict]) -> str:
         name = None
 
         if not title or title == "Unknown Text":
-            name = meta.get("source") \
-                   or meta.get("file_path")
+            name = meta.get("source") or meta.get("file_path")
             name = os.path.basename(name)
 
         if name or title:
@@ -66,7 +62,8 @@ def _get_document_name(document: Union[Document, Dict]) -> str:
 
 
 class SearchType(Enum):
-    """ Search Type Enum for VectorStore.search()"""
+    """Search Type Enum for VectorStore.search()"""
+
     # TODO: Delete if restrict only Chroma in _db
     MMR = "mmr"
     SIMILARITY = "similarity"
@@ -74,28 +71,35 @@ class SearchType(Enum):
 
 class PaperDatasetLC:
     _db: Optional[VectorStore] = None
-    _papers: Dict = dict()  # For listing included documents, retrieve whole documents - TODO: remove
+    _papers: Dict = (
+        dict()
+    )  # For listing included documents, retrieve whole documents - TODO: remove
     _default_llm: Optional[BaseLanguageModel] = None
     _prompts: PromptHolder = DEFAULT_PROMPT_REGISTER
 
-    _feature_list: Optional[List[str]] = None   # meta private
-    max_num_words = 1500    # TODO: method to take from llm and setters
+    _feature_list: Optional[List[str]] = None  # meta private
+    max_num_words = 1500  # TODO: method to take from llm and setters
 
-    def __init__(self, db: Optional[VectorStore] = None,
-                 llm: Optional[BaseLanguageModel] = None):
+    def __init__(
+        self, db: Optional[VectorStore] = None, llm: Optional[BaseLanguageModel] = None
+    ):
         if not db:
             import openai
             from langchain.llms.openai import OpenAI
 
             if llm:
-                raise ValueError("PaperDatasetLC cannot be instantiated "
-                                 "if only llm model is given,"
-                                 " without proper embeddings")
+                raise ValueError(
+                    "PaperDatasetLC cannot be instantiated "
+                    "if only llm model is given,"
+                    " without proper embeddings"
+                )
 
-            logger.info("Dataset with not specified db"
-                        " - using Chroma with OpenAI embeddings")
-            self._db = Chroma(embedding_function=OpenAIEmbeddings(
-                openai_api_key=openai.api_key))
+            logger.info(
+                "Dataset with not specified db" " - using Chroma with OpenAI embeddings"
+            )
+            self._db = Chroma(
+                embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key)
+            )
             self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
 
         else:
@@ -103,23 +107,36 @@ class PaperDatasetLC:
             self._default_llm = llm
 
             if self._default_llm:
-                logger.warning("LLM model not provided -"
-                               " search functions requiring it will not be available")
+                logger.warning(
+                    "LLM model not provided -"
+                    " search functions requiring it will not be available"
+                )
 
-        for prompt_name in ["identify_feature", "summarize_paper", "summarize_paper_refine"]:
-            if prompt_name not in self._prompts and prompt_name in DEFAULT_PROMPT_REGISTER:
-                self._prompts.load_defined_prompt(name=prompt_name, prompt=DEFAULT_PROMPT_REGISTER[prompt_name])
+        for prompt_name in [
+            "identify_feature",
+            "summarize_paper",
+            "summarize_paper_refine",
+        ]:
+            if (
+                prompt_name not in self._prompts
+                and prompt_name in DEFAULT_PROMPT_REGISTER
+            ):
+                self._prompts.load_defined_prompt(
+                    name=prompt_name, prompt=DEFAULT_PROMPT_REGISTER[prompt_name]
+                )
                 logger.info(f"Prompt {prompt_name} loaded from default register")
 
             elif prompt_name not in self._prompts:
-                logger.warning(f"Prompt {prompt_name} not defined -"
-                               f" Some functions requiring it will not be available")
+                logger.warning(
+                    f"Prompt {prompt_name} not defined -"
+                    f" Some functions requiring it will not be available"
+                )
 
     def _split_document_by_length(self, document: Document) -> List[Document]:
         """Split document by max_num_words"""
         regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
 
-        word_count = len(document.page_content.split(' '))
+        word_count = len(document.page_content.split(" "))
 
         if word_count > self.max_num_words:
             documents = []
@@ -128,15 +145,26 @@ class PaperDatasetLC:
 
             if (len(regex_matches) + 1) >= word_count / self.max_num_words:
                 # Split by found sections
-                for match, text in zip(regex_matches, re.split(regex, document.page_content)):
-                    documents.append(Document(page_content=match + ' ' + text, metadata=document.metadata))
+                for match, text in zip(
+                    regex_matches, re.split(regex, document.page_content)
+                ):
+                    documents.append(
+                        Document(
+                            page_content=match + " " + text, metadata=document.metadata
+                        )
+                    )
             else:
-                words = document.page_content.split(' ')
+                words = document.page_content.split(" ")
                 last_index = 0
                 for i in range(1, len(words), self.max_num_words):
                     documents.append(
-                        Document(page_content=' '.join(words[last_index:i * self.max_num_words]),
-                                 metadata=document.metadata))
+                        Document(
+                            page_content=" ".join(
+                                words[last_index : i * self.max_num_words]
+                            ),
+                            metadata=document.metadata,
+                        )
+                    )
                     last_index = i
         else:
             documents = [document]
@@ -144,7 +172,7 @@ class PaperDatasetLC:
         return documents
 
     def add_document(
-            self, document: Document, metadata: Optional[Dict] = None
+        self, document: Document, metadata: Optional[Dict] = None
     ) -> List[str]:
         """Add Document object to vector database
 
@@ -226,8 +254,7 @@ class PaperDatasetLC:
             return []  # No Object added - return empty list
 
     def add_texts(
-            self, texts: Iterable[str], metadatas: List[Dict],
-            skip_invalid: bool = False
+        self, texts: Iterable[str], metadatas: List[Dict], skip_invalid: bool = False
     ) -> List[str]:
         """Add multiple texts as separate documents to vector database
 
@@ -270,7 +297,9 @@ class PaperDatasetLC:
 
                 valid_records.extend(
                     self._split_document_by_length(
-                        Document(page_content=text, metadata=meta)))
+                        Document(page_content=text, metadata=meta)
+                    )
+                )
 
             except ValueError as err:
                 logger.info(err)
@@ -378,8 +407,10 @@ class PaperDatasetLC:
     #     #TODO
     #     raise NotImplementedError()
 
-    def unique_list_of_documents(self, regex_filter: Optional[str] = None) -> List[Tuple[str, ...]]:
-        """ List of papers stored in vector database to tuple of (title, source, file_path).
+    def unique_list_of_documents(
+        self, regex_filter: Optional[str] = None
+    ) -> List[Tuple[str, ...]]:
+        """List of papers stored in vector database to tuple of (title, source, file_path).
         List is shortened to not contain next pages of same document.
 
 
@@ -396,10 +427,14 @@ class PaperDatasetLC:
         """
         document_set = set()
 
-        for meta in tqdm(self.get(include=["metadatas"])["metadatas"], desc="Listing documents"):
+        for meta in tqdm(
+            self.get(include=["metadatas"])["metadatas"], desc="Listing documents"
+        ):
             fields = [meta.get(field, "") for field in ["title", "source", "file_path"]]
 
-            if not regex_filter or any(re.match(regex_filter, field) for field in fields):
+            if not regex_filter or any(
+                re.match(regex_filter, field) for field in fields
+            ):
                 document_set.add(tuple(fields))
 
         return list(document_set)
@@ -409,10 +444,15 @@ class PaperDatasetLC:
         # TODO: Filters?
         documents = self.get(include=["metadatas"])
 
-        return [(doc_id, doc) for doc_id, doc in zip(documents["ids"], map(_get_document_name, documents["metadatas"]))]
+        return [
+            (doc_id, doc)
+            for doc_id, doc in zip(
+                documents["ids"], map(_get_document_name, documents["metadatas"])
+            )
+        ]
 
     def list_new_features(self, store_result: bool = True) -> List[str]:
-        """  List of all new features detected in documents
+        """List of all new features detected in documents
 
         Parameters
         ----------
@@ -430,8 +470,12 @@ class PaperDatasetLC:
 
         feature_set = set()
 
-        for metadata in tqdm(self.get(where={"new_features": {"$ne": ""}}, include=["metadatas"])["metadatas"],
-                             desc="Listing features"):
+        for metadata in tqdm(
+            self.get(where={"new_features": {"$ne": ""}}, include=["metadatas"])[
+                "metadatas"
+            ],
+            desc="Listing features",
+        ):
             features = metadata["new_features"].lower().split(", ")
             feature_set.update(features)
 
@@ -443,9 +487,12 @@ class PaperDatasetLC:
         return feature_list
 
     def list_available_fields(self) -> List[str]:
-        """ List of all available metadata fields in documents """
+        """List of all available metadata fields in documents"""
         features = set()
-        for metadata in tqdm(self.get(include=["metadatas"])["metadatas"], desc="Listing available fields"):
+        for metadata in tqdm(
+            self.get(include=["metadatas"])["metadatas"],
+            desc="Listing available fields",
+        ):
             features.update(metadata.keys())
 
         return list(features)
@@ -479,8 +526,10 @@ class PaperDatasetLC:
         if isinstance(self._db, Chroma):
             return self._db.get(**kwargs)
 
-    def get_by_id(self, ids: Union[str, Iterable[str]], include: Optional[List[str]] = None) -> Dict[str, Any]:
-        """ Get documents by id
+    def get_by_id(
+        self, ids: Union[str, Iterable[str]], include: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Get documents by id
 
         Parameters
         ----------
@@ -500,8 +549,10 @@ class PaperDatasetLC:
         """
         return self.get(ids=ids, include=include)
 
-    def get_containing_field(self, field_name: str, include: Optional[List[str]] = None) -> Dict[str, Any]:
-        """ Get documents with non-empty given field
+    def get_containing_field(
+        self, field_name: str, include: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Get documents with non-empty given field
 
         Parameters
         ----------
@@ -519,13 +570,14 @@ class PaperDatasetLC:
             Dictionary of documents with included keys
 
         """
-        return self.get(where={field_name: {"$ne": ""}},
-                        include=include)
+        return self.get(where={field_name: {"$ne": ""}}, include=include)
 
     def similarity_search(
-            self, query: str, n_results: int = 3,
-            search_type: SearchType = SearchType.MMR,
-            filter: Optional[Dict[str, str]] = None
+        self,
+        query: str,
+        n_results: int = 3,
+        search_type: SearchType = SearchType.MMR,
+        filter: Optional[Dict[str, str]] = None,
     ) -> List[Document]:
         """Search by similarity of embeddings
 
@@ -554,11 +606,12 @@ class PaperDatasetLC:
                 " and may not work with other databases than Chroma"
             )
 
-        return self._db.search(query=query, search_type=search_type.value, k=n_results, filter=filter)
+        return self._db.search(
+            query=query, search_type=search_type.value, k=n_results, filter=filter
+        )
 
     def similarity_search_with_scores(
-            self, query: str, n_results: int = 3,
-            score_threshold: Optional[float] = None
+        self, query: str, n_results: int = 3, score_threshold: Optional[float] = None
     ) -> List[Tuple[Document, float]]:
         """
 
@@ -587,8 +640,14 @@ class PaperDatasetLC:
         )
 
     def llm_search(
-            self, query: str, llm: Optional[BaseLanguageModel] = None, **kwargs: Any
-    ) -> str:
+        self,
+        query: str,
+        chain_type: str = "map_reduce",
+        return_source_documents: bool = False,
+        llm: Optional[BaseLanguageModel] = None,
+        retriever_kwargs: Optional[Dict] = None,
+        chain_kwargs: Optional[Dict] = None,
+    ) -> Tuple[str, Optional[List[Document]]]:
         """LLM search engine for searching content in documents
 
         Parameters
@@ -597,53 +656,57 @@ class PaperDatasetLC:
             Search Query
         llm: Optional[BaseLanguageModel]
             LLM model to use. If not provided OpenAI default model is used
-        kwargs: Any
+        chain_type: str
+            Type of chain to use:
+            - "map_reduce" first applies an LLM chain to each document individually (the Map step),
+                treating the chain output as a new document.
+                It then passes all the new documents to a separate combine documents chain to get a single output
+                 (the Reduce step).
+                  It can optionally first compress, or collapse,
+                  the mapped documents to make sure that they fit in the combine documents chain
+                  (which will often pass them to an LLM)
+            - "stuff" takes a list of documents, inserts them all into a prompt and passes that prompt to an LLM.
+            - "refine" constructs a response by looping over the input documents and iteratively updating its answer.
+                For each document, it passes all non-document inputs,
+                the current document, and the latest intermediate answer to an LLM chain to get a new answer.
+            - "map_rerank"
+                The map re-rank documents chain runs an initial prompt on each document,
+                that not only tries to complete a task but also gives a score for how certain it is in its answer.
+                The highest scoring response is returned.
+
+        return_source_documents: bool
+            If True - Return also source documents
+
+        retriever_kwargs: Optional[Dict]
+            Keyword arguments for database retriever method (VectorStoreRetriever)
+
+        chain_kwargs: Optional[Dict]
             Keyword arguments for 'RetrievalQA.from_chain_type' method
 
         Returns
         -------
-        str
-            LLM response
+        Tuple[str, Optional[List[Document]]]
+            Tuple of (Answer, List of source documents (if 'return_source_documents')).
 
         """
         llm = llm or self._default_llm
         if not llm:
             raise RuntimeError("LLM not provided")
 
+        if not retriever_kwargs:
+            retriever_kwargs = {}
+
+        if not chain_kwargs:
+            chain_kwargs = {}
         chain = RetrievalQA.from_chain_type(
-            llm, retriever=self._db.as_retriever(), **kwargs
+            llm,
+            retriever=self._db.as_retriever(**retriever_kwargs),
+            chain_type=chain_type,
+            return_source_documents=return_source_documents,
+            **chain_kwargs,
         )
-        return chain.run(query)
-
-    def llm_search_with_sources(
-            self, query: str, llm: Optional[BaseLanguageModel] = None, **kwargs: Any
-    ) -> dict:
-        """LLM search engine for searching content in documents with sources
-
-        Parameters
-        ----------
-        query: str
-            Search Query
-        llm: Optional[BaseLanguageModel]
-            LLM model to use. If not provided default model is used
-        kwargs: Any
-            Keyword arguments for 'RetrievalQAWithSourcesChain.from_chain_type' method
-
-        Returns
-        -------
-        dict
-            Dictionary containing response and relevant source documents
-
-        """
-        llm = llm or self._default_llm
-        if not llm:
-            raise RuntimeError("LLM not provided")
-
-        chain = RetrievalQAWithSourcesChain.from_chain_type(
-            llm, retriever=self._db.as_retriever(), **kwargs
-        )
-        return chain({chain.question_key: query})
-
+        result = chain({"query": query})
+        return result["result"], result.get("source_documents", None)
 
     # def filter_by_categories(self, category: Union[Tuple[str], str]):
     # TODO:
@@ -651,9 +714,13 @@ class PaperDatasetLC:
 
     # def get_as_documents(self, **kwargs):
 
-    def update_document_features(self, document_ids: Union[str, Iterable[str]] = None,
-                                 llm: Optional[BaseLanguageModel] = None, force_reload: bool = False):
-        """ Update document with features detected by LLM model
+    def update_document_features(
+        self,
+        document_ids: Union[str, Iterable[str]] = None,
+        llm: Optional[BaseLanguageModel] = None,
+        force_reload: bool = False,
+    ):
+        """Update document with features detected by LLM model
 
         Parameters
         ----------
@@ -686,8 +753,9 @@ class PaperDatasetLC:
 
         llm_chain = LLMChain(llm=llm, prompt=base_prompt)
 
-        for doc_id, doc_text, metadata in tqdm(zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating features"):
-
+        for doc_id, doc_text, metadata in tqdm(
+            zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating features"
+        ):
             if metadata.get("new_features") and not force_reload:
                 # Skip already identified documents
                 continue
@@ -697,16 +765,22 @@ class PaperDatasetLC:
                 logger.warning(f"Document {doc_id} is empty")
                 continue
 
-            response = llm_chain.predict(text=doc_text, format_instructions=parser.get_format_instructions())
+            response = llm_chain.predict(
+                text=doc_text, format_instructions=parser.get_format_instructions()
+            )
 
             data = parser.parse(response).dict()
             # Note: Lists are not accepted in metadata
             # TODO: correct metadata by function?
-            data.update({k: ", ".join(v) for k, v in data.items() if isinstance(v, list)})
+            data.update(
+                {k: ", ".join(v) for k, v in data.items() if isinstance(v, list)}
+            )
             metadata.update(data)
 
             # Update document in database
-            self._db.update_document(doc_id, Document(page_content=doc_text, metadata=metadata))
+            self._db.update_document(
+                doc_id, Document(page_content=doc_text, metadata=metadata)
+            )
 
     # @staticmethod
     # def get_document_info(document: Document):
@@ -714,9 +788,14 @@ class PaperDatasetLC:
     #     #TODO: Needed?
     #     return document.metadata
 
-    def search_by_field(self, field_name: str, search_value: str, regex_match: bool = False,
-                        include: Optional[List[str]] = None) -> Dict[str, List[Any]]:
-        """ Search documents by value in given field
+    def search_by_field(
+        self,
+        field_name: str,
+        search_value: str,
+        regex_match: bool = False,
+        include: Optional[List[str]] = None,
+    ) -> Dict[str, List[Any]]:
+        """Search documents by value in given field
 
         Parameters
         ----------
@@ -744,19 +823,26 @@ class PaperDatasetLC:
 
         # Double get from db due to Chroma not supporting regex search
         # and lower memory usage with filtering only by metadata first
-        documents = self.get_containing_field(field_name=field_name, include=["metadatas"])
+        documents = self.get_containing_field(
+            field_name=field_name, include=["metadatas"]
+        )
         found_ids = []
 
-        for i, doc_meta in enumerate(tqdm(documents["metadatas"], desc="Searching documents")):
-
+        for i, doc_meta in enumerate(
+            tqdm(documents["metadatas"], desc="Searching documents")
+        ):
             if search_value in doc_meta[field_name]:
                 found_ids.append(documents["ids"][i])
 
         return self.get(ids=found_ids, include=include)
 
-    def search_by_name(self, search_value: str, regex_match: bool = False,
-                       include: Optional[List[str]] = None) -> Dict[str, List[Any]]:
-        """ Search documents by name (title or source)
+    def search_by_name(
+        self,
+        search_value: str,
+        regex_match: bool = False,
+        include: Optional[List[str]] = None,
+    ) -> Dict[str, List[Any]]:
+        """Search documents by name (title or source)
 
         Parameters
         ----------
@@ -779,16 +865,8 @@ class PaperDatasetLC:
         if not regex_match:
             query = {
                 "$or": [
-                    {
-                        "title": {
-                            "$eq": search_value
-                        }
-                    },
-                    {
-                        "source": {
-                            "$eq": search_value
-                        }
-                    }
+                    {"title": {"$eq": search_value}},
+                    {"source": {"$eq": search_value}},
                 ]
             }
             return self.get(where=query, include=include)
@@ -796,11 +874,15 @@ class PaperDatasetLC:
         # Double get from db due to Chroma not supporting regex search
         # and lower memory usage with filtering only by metadata first
 
-        documents = self.get(include=['metadatas'])
+        documents = self.get(include=["metadatas"])
         found_ids = []
 
-        for i, doc_meta in enumerate(tqdm(documents["metadatas"], desc="Searching documents")):
-            if re.match(search_value, doc_meta["title"]) or re.match(search_value, doc_meta["source"]):
+        for i, doc_meta in enumerate(
+            tqdm(documents["metadatas"], desc="Searching documents")
+        ):
+            if re.match(search_value, doc_meta["title"]) or re.match(
+                search_value, doc_meta["source"]
+            ):
                 found_ids.append(documents["ids"][i])
 
         return self.get(ids=found_ids, include=include)
@@ -814,17 +896,21 @@ class PaperDatasetLC:
 
         for prompt_name in ["summarize_paper", "summarize_paper_refine"]:
             if prompt_name not in self._prompts:
-                logger.warning(f"Prompt {prompt_name} not defined -"
-                               f" Summary function will not be available")
+                logger.warning(
+                    f"Prompt {prompt_name} not defined -"
+                    f" Summary function will not be available"
+                )
                 return
 
-        llm_chain = load_summarize_chain(llm=self._default_llm,
-                                         chain_type="refine",
-                                         question_prompt=self._prompts["summarize_paper"],
-                                         refine_prompt=self._prompts["summarize_paper_refine"],
-                                         document_variable_name="text",
-                                         input_key="documents",
-                                         output_key="summary")
+        llm_chain = load_summarize_chain(
+            llm=self._default_llm,
+            chain_type="refine",
+            question_prompt=self._prompts["summarize_paper"],
+            refine_prompt=self._prompts["summarize_paper_refine"],
+            document_variable_name="text",
+            input_key="documents",
+            output_key="summary",
+        )
 
         result = llm_chain({"documents": docs})
 
