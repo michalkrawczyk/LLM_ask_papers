@@ -91,7 +91,7 @@ class PaperDatasetLC:
                 raise ValueError(
                     "PaperDatasetLC cannot be instantiated "
                     "if only llm model is given,"
-                    " without proper embeddings"
+                    " without proper embeddings in data storage"
                 )
 
             logger.info(
@@ -113,7 +113,7 @@ class PaperDatasetLC:
                 )
 
         for prompt_name in [
-            "identify_feature",
+            "identify_features",
             "summarize_paper",
             "summarize_paper_refine",
         ]:
