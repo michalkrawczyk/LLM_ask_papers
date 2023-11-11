@@ -577,7 +577,7 @@ class PaperDatasetLC:
         query: str,
         n_results: int = 3,
         search_type: SearchType = SearchType.MMR,
-        filter: Optional[Dict[str, str]] = None,
+        db_filter: Optional[Dict[str, str]] = None,
     ) -> List[Document]:
         """Search by similarity of embeddings
 
@@ -591,7 +591,7 @@ class PaperDatasetLC:
             Type of search:
             - SearchType.MMR for max relevance search
             - SearchType.SIMILARITY for similarity search
-        filter: Optional[Dict[str, str]]
+        db_filter: Optional[Dict[str, str]]
             Optional filters for database (If Chroma)
 
         Returns
@@ -600,18 +600,19 @@ class PaperDatasetLC:
             List of relevant Documents
 
         """
-        if filter and not isinstance(self._db, Chroma):
+        if db_filter and not isinstance(self._db, Chroma):
             logger.warning(
                 "Filter option was not tested for other vector storages"
                 " and may not work with other databases than Chroma"
             )
 
         return self._db.search(
-            query=query, search_type=search_type.value, k=n_results, filter=filter
+            query=query, search_type=search_type.value, k=n_results, filter=db_filter
         )
 
     def similarity_search_with_scores(
-        self, query: str, n_results: int = 3, score_threshold: Optional[float] = None
+        self, query: str, n_results: int = 3, score_threshold: Optional[float] = None,
+        search_type: SearchType = SearchType.MMR, db_filter: Optional[Dict[str, str]] = None,
     ) -> List[Tuple[Document, float]]:
         """
 
@@ -623,6 +624,12 @@ class PaperDatasetLC:
             Limit results to 'n' documents
         score_threshold: float
             Optional score threshold for filtering results
+        search_type: SearchType
+            Type of search:
+            - SearchType.MMR for max relevance search
+            - SearchType.SIMILARITY for similarity search
+        db_filter: Optional[Dict[str, str]]
+            Optional filters for database (If Chroma)
 
         Returns
         -------
@@ -630,13 +637,13 @@ class PaperDatasetLC:
             List of tuples (Relevant document, score)
 
         """
-        if filter and not isinstance(self._db, Chroma):
+        if db_filter and not isinstance(self._db, Chroma):
             logger.warning(
                 "Filter option was not tested for other vector storages and may not work with other databases than Chroma"
             )
 
         return self._db.similarity_search_with_relevance_scores(
-            query=query, k=n_results, filter=filter, score_threshold=score_threshold
+            query=query, k=n_results, filter=db_filter, score_threshold=score_threshold, search_type=search_type.value
         )
 
     def llm_search(
