@@ -158,7 +158,7 @@ class ArxivAPIWrapper2(BaseModel):
 
         docs: List[Document] = []
 
-        for result in tqdm(results, desc="Loading files..."):
+        for page_number, result in enumerate(tqdm(results, desc="Loading files...")):
             paper_id = os.path.split(result.entry_id)[-1]
             paper_title = _clean_filename_str(result.title)
             paper_filepath = f"{self.file_save_dir}{os.sep}{paper_id}.{paper_title}.pdf"
@@ -202,6 +202,7 @@ class ArxivAPIWrapper2(BaseModel):
                 "summary": result.summary,
                 "published": str(result.updated.date()),
                 "file_path": paper_filepath if already_exist or self.save_pdf else "",
+                "page": page_number,
                 **extra_metadata,
             }
             doc = Document(
