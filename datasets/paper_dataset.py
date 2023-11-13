@@ -841,7 +841,7 @@ class PaperDatasetLC:
             if search_value in doc_meta[field_name]:
                 found_ids.append(documents["ids"][i])
 
-        return self.get(ids=found_ids, include=include)
+        return self.get(ids=found_ids if found_ids else [""], include=include)
 
     def search_by_name(
         self,
@@ -892,7 +892,7 @@ class PaperDatasetLC:
             ):
                 found_ids.append(documents["ids"][i])
 
-        return self.get(ids=found_ids, include=include)
+        return self.get(ids=found_ids if found_ids else [""], include=include)
 
     def summarize_paper(self, paper_name):
         docs = self.get(where={"title": paper_name})["documents"]
