@@ -1,12 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
-
-# TODO: Think about dynamic created BaseModels by yaml file
-# TODO: Restrict Pydentic classes to not store lists
-# TODO: Promppts should be inited in register already with below classes?
+from typing import List
 
 
 class ShortInfoSummary(BaseModel):
+    """Short summary of the research paper, focused on new features/strategies introduced in the paper"""
     model_name: str = Field(
         description="Name of the model if provided", default="Unknown"
     )

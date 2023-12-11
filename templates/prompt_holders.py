@@ -1,3 +1,13 @@
+"""
+PromptHolder class is used to store or create predefined langchain prompts for later usage.
+It is created to provide invidual set of prompts for different PaperDatasetLC instances
+(among others for different models or purposes - e.g. for one dataset with medical topics and one for financial).
+
+If user don't want to use multiple instances,
+he can use default prompt holder (DEFAULT_PROMPT_REGISTER) from 'templates' module,
+which is used by default when no PromptHolder is provided.
+"""
+
 import logging
 import os
 from typing import Dict
@@ -8,9 +18,6 @@ from langchain.schema import BasePromptTemplate
 
 # ROOT_PATH = Path(__file__).resolve().parent.parent
 logger = logging.getLogger(__name__)
-
-# TODO: Langchain pydentic schema for prompt holder
-
 
 @dataclass
 class PromptHolder:
@@ -31,8 +38,8 @@ class PromptHolder:
         except Exception as err:
             logger.error(f"Error loading prompt {name} from {prompt_path}: {err}")
 
-    def load_defined_prompt(self, name: str, prompt: BasePromptTemplate):
-        if name not in self.PROMPTS:
+    def load_defined_prompt(self, name: str, prompt: BasePromptTemplate, force_reload: bool = False):
+        if name not in self.PROMPTS or force_reload:
             self.PROMPTS[name] = prompt
         else:
             logger.warning(f"Prompt {name} already defined, skipping.")
