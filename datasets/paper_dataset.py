@@ -5,13 +5,15 @@ import re
 from typing import Any, Dict, List, Union, Tuple, Optional, Iterable
 
 from langchain.base_language import BaseLanguageModel
-from langchain.chains import LLMChain, RetrievalQA, RetrievalQAWithSourcesChain
+from langchain.chains import LLMChain, RetrievalQA
 from langchain.chains.summarize import load_summarize_chain
 from langchain.document_loaders import PyMuPDFLoader
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.output_parsers import PydanticOutputParser
-from langchain.schema import Document, BasePromptTemplate
+from langchain.schema import Document, BaseOutputParser
 from langchain.vectorstores import Chroma, VectorStore
+from langchain.prompts import PromptTemplate
+from pydantic import BaseModel
 from tqdm import tqdm
 
 from arxiv_utils import (
@@ -20,24 +22,6 @@ from arxiv_utils import (
 from templates import ShortInfoSummary, DEFAULT_PROMPT_REGISTER, PromptHolder
 
 logger = logging.getLogger(__name__)
-
-""" TODO:
-
-test search functions
-summarize_paper - test + prompt
-add_page (305 line)
-add_youtube_summary (310 line)
-list_available_fields - test
-
-- For single paper dataset should be used only single embedding and llm
-- Nougat reader (example on Hugging Face)
-- update_document_features as universal?
-
-- 
- - add mising docs
-- TensorRT acceleration if possible
-- normally identify summary for page and one refined for whole paper?
-"""
 
 
 def _get_document_name(document: Union[Document, Dict]) -> str:
@@ -63,8 +47,6 @@ def _get_document_name(document: Union[Document, Dict]) -> str:
 
 class SearchType(Enum):
     """Search Type Enum for VectorStore.search()"""
-
-    # TODO: Delete if restrict only Chroma in _db
     MMR = "mmr"
     SIMILARITY = "similarity"
 
@@ -113,9 +95,8 @@ class PaperDatasetLC:
                 )
 
         for prompt_name in [
-            "identify_features",
-            "summarize_paper",
-            "summarize_paper_refine",
+            "summarize_doc",
+            "summarize_doc_refine",
         ]:
             if (
                 prompt_name not in self._prompts
@@ -129,7 +110,7 @@ class PaperDatasetLC:
             elif prompt_name not in self._prompts:
                 logger.warning(
                     f"Prompt {prompt_name} not defined -"
-                    f" Some functions requiring it will not be available"
+                    f" Some functions using it, may not work or require changing prompt in parameters "
                 )
 
     def _split_document_by_length(self, document: Document) -> List[Document]:
@@ -399,14 +380,6 @@ class PaperDatasetLC:
 
         return []  # No Object added - return empty list
 
-    # def add_page(self, url: str):
-    #     #TODO
-    #     pass
-
-    # def add_youtube_video(self, url: str) -> List[str]:
-    #     #TODO
-    #     raise NotImplementedError()
-
     def unique_list_of_documents(
         self, regex_filter: Optional[str] = None
     ) -> List[Tuple[str, ...]]:
@@ -441,7 +414,6 @@ class PaperDatasetLC:
 
     def list_documents_by_id(self) -> List[Tuple[str, str]]:
         """Shortened List of papers stored in vector database by id"""
-        # TODO: Filters?
         documents = self.get(include=["metadatas"])
 
         return [
@@ -655,7 +627,7 @@ class PaperDatasetLC:
         retriever_kwargs: Optional[Dict] = None,
         chain_kwargs: Optional[Dict] = None,
     ) -> Tuple[str, Optional[List[Document]]]:
-        """LLM search engine for searching content in documents
+        """LLM RAG search engine for searching content in documents
 
         Parameters
         ----------
@@ -725,22 +697,138 @@ class PaperDatasetLC:
         self,
         document_ids: Union[str, Iterable[str]] = None,
         llm: Optional[BaseLanguageModel] = None,
-        force_reload: bool = False,
+        force_reload: bool = False, pydantic_object: BaseModel = ShortInfoSummary,
     ):
-        """Update document with features detected by LLM model
+        parser = PydanticOutputParser(pydantic_object=pydantic_object)
+        self.llm_doc_meta_updater(update_key="new_features", prompt="identify_features", predefined_prompt=True,
+                                  document_ids=document_ids, llm=llm, force_reload=force_reload, output_parser=parser)
+        # """Update document with features detected by LLM model
+        #
+        # Parameters
+        # ----------
+        # document_ids: Union[str, Iterable[str]]
+        #     Document ids to update
+        # llm: Optional[BaseLanguageModel]
+        #     LLM model to use. If not provided, default model is used
+        # force_reload: bool
+        #     If True - Documents with already identified features will be also updated
+        #
+        # """
+        # if isinstance(document_ids, str):
+        #     document_ids = [document_ids]
+        #
+        # docs = self.get(ids=document_ids, include=["metadatas", "documents"])
+        #
+        # if not docs:
+        #     logger.warning(f"Documents {document_ids} not found")
+        #     return
+        #
+        # # TODO: move output parser to prompt (with assert that prompt has parser)
+        # parser = PydanticOutputParser(pydantic_object=ShortInfoSummary)
+        #
+        # llm: BaseLanguageModel = llm or self._default_llm
+        # base_prompt: BasePromptTemplate = self._prompts.get("identify_features")
+        #
+        # if self._prompts is None:
+        #     logger.warning("Prompt 'identify_features' is not defined")
+        #     return
+        #
+        # llm_chain = LLMChain(llm=llm, prompt=base_prompt)
+        #
+        # for doc_id, doc_text, metadata in tqdm(
+        #     zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating features"
+        # ):
+        #     if metadata.get("new_features") and not force_reload:
+        #         # Skip already identified documents
+        #         continue
+        #
+        #     if not doc_text:
+        #         # Skip empty documents
+        #         logger.warning(f"Document {doc_id} is empty")
+        #         continue
+        #
+        #     response = llm_chain.predict(
+        #         text=doc_text, format_instructions=parser.get_format_instructions()
+        #     )
+        #
+        #     data = parser.parse(response).dict()
+        #     # Note: Lists are not accepted in metadata
+        #     # TODO: correct metadata by function?
+        #     data.update(
+        #         {k: ", ".join(v) for k, v in data.items() if isinstance(v, list)}
+        #     )
+        #     metadata.update(data)
+        #
+        #     # Update document in database
+        #     self._db.update_document(
+        #         doc_id, Document(page_content=doc_text, metadata=metadata)
+        #     )
+
+    def llm_doc_meta_updater(self, update_key: str, prompt: Union[str, PromptTemplate], predefined_prompt: bool = True,
+                             document_ids: Union[str, Iterable[str], None] = None, llm: Optional[BaseLanguageModel] = None,
+                             output_parser: Optional[BaseOutputParser] = None, force_reload: bool = False):
+        """ Update document metadata with answers from LLM model based on predefined prompt questions
 
         Parameters
         ----------
-        document_ids: Union[str, Iterable[str]]
-            Document ids to update
+        update_key: str
+            Key in metadata to update
+        prompt: Union[str, PromptTemplate]
+            Prompt to use for updating metadata.
+
+            .. note:: if prompt is string, it will be picked from predefined or created,
+             based on `predefined_prompt` value
+
+        predefined_prompt: bool
+            If True - use predefined prompt from register
+            Otherwise - create prompt from given string
+
+        document_ids:
+            Document ids to update. If None - all documents will be updated
+
         llm: Optional[BaseLanguageModel]
             LLM model to use. If not provided, default model is used
+
+        output_parser: Optional[BaseOutputParser]
+            Output parser to use. If not provided, parser from prompt will be used
+
         force_reload: bool
             If True - Documents with already identified features will be also updated
 
+        Returns
+        -------
+
         """
-        if isinstance(document_ids, str):
-            document_ids = [document_ids]
+        llm: BaseLanguageModel = llm or self._default_llm
+
+        if isinstance(prompt, str):
+            prompt_template = self._prompts.get(prompt) if predefined_prompt else PromptTemplate(template=prompt)
+
+        else:
+            # Already defined PromptTemplate
+            prompt_template = prompt
+
+        if prompt_template is None:
+            logger.warning(f"Failed to find prompt - probably not defined")
+            return
+
+        if "text" not in prompt_template.input_variables:
+            #
+            logger.warning(f"Prompt {prompt_template.name} has no 'text' variable")
+            return
+
+        if output_parser:
+            if "format_instructions" not in prompt_template.template:
+                instructed_prompt = prompt_template.template.copy()
+                instructed_prompt.template = instructed_prompt.template + "\n" + output_parser.get_format_instructions()
+
+            else:
+                instructed_prompt = prompt.partial(format_instructions=output_parser.get_format_instructions())
+
+            chain = instructed_prompt | llm | output_parser
+
+        else:
+            chain = prompt_template | llm
 
         docs = self.get(ids=document_ids, include=["metadatas", "documents"])
 
@@ -748,22 +836,11 @@ class PaperDatasetLC:
             logger.warning(f"Documents {document_ids} not found")
             return
 
-        # TODO: move output parser to prompt (with assert that prompt has parser)
-        parser = PydanticOutputParser(pydantic_object=ShortInfoSummary)
-
-        llm: BaseLanguageModel = llm or self._default_llm
-        base_prompt: BasePromptTemplate = self._prompts.get("identify_features")
-
-        if self._prompts is None:
-            logger.warning("Prompt 'identify_features' is not defined")
-            return
-
-        llm_chain = LLMChain(llm=llm, prompt=base_prompt)
-
         for doc_id, doc_text, metadata in tqdm(
-            zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating features"
+                zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating metadata"
         ):
-            if metadata.get("new_features") and not force_reload:
+            # TODO: think about rewrite for running in parallel if llm allows
+            if metadata.get(update_key) and not force_reload:
                 # Skip already identified documents
                 continue
 
@@ -772,28 +849,13 @@ class PaperDatasetLC:
                 logger.warning(f"Document {doc_id} is empty")
                 continue
 
-            response = llm_chain.predict(
-                text=doc_text, format_instructions=parser.get_format_instructions()
-            )
-
-            data = parser.parse(response).dict()
-            # Note: Lists are not accepted in metadata
-            # TODO: correct metadata by function?
-            data.update(
-                {k: ", ".join(v) for k, v in data.items() if isinstance(v, list)}
-            )
-            metadata.update(data)
+            metadata[update_key] = chain.invoke({"text": doc_text, "metadata": metadata})
+            #TODO: check if data is parsed correctly
 
             # Update document in database
             self._db.update_document(
                 doc_id, Document(page_content=doc_text, metadata=metadata)
             )
-
-    # @staticmethod
-    # def get_document_info(document: Document):
-    #     """Get document metadata (info)"""
-    #     #TODO: Needed?
-    #     return document.metadata
 
     def search_by_field(
         self,
@@ -894,34 +956,57 @@ class PaperDatasetLC:
 
         return self.get(ids=found_ids if found_ids else [""], include=include)
 
-    def summarize_paper(self, paper_name):
-        docs = self.get(where={"title": paper_name})["documents"]
+    def summarize_docs(self, document_ids: Union[str, Iterable[str]] = None,
+                       llm: Optional[BaseLanguageModel] = None,
+                       summarize_prompt: str = "summarize_doc", refine_prompt: str = "summarize_doc_refine"):
+        """ Summarize documents by LLM model
+
+        .. note: This only uses predefined prompts as it is not intended to support custom prompts
+
+        Parameters
+        ----------
+        document_ids: Union[str, Iterable[str]]
+            Document ids to summarize (single id or list of ids)
+        llm: Optional[BaseLanguageModel]
+            LLM model to use. If not provided, default model is used
+        summarize_prompt: str
+            Name of prompt to use for summarization
+        refine_prompt: str
+            Name of prompt to use for summarization refinement
+
+        Returns
+        -------
+
+
+        """
+        docs = self.get_by_id(ids=document_ids, include=["documents"])
+        llm: BaseLanguageModel = llm or self._default_llm
 
         if not docs:
-            logger.warning(f"Paper {paper_name} not found")
+            logger.warning(f"Documents {document_ids} not found")
             return
 
-        for prompt_name in ["summarize_paper", "summarize_paper_refine"]:
+        for prompt_name in [summarize_prompt, refine_prompt]:
             if prompt_name not in self._prompts:
                 logger.warning(
                     f"Prompt {prompt_name} not defined -"
-                    f" Summary function will not be available"
+                    f" Unable to summarize documents"
                 )
                 return
 
         llm_chain = load_summarize_chain(
-            llm=self._default_llm,
+            llm=llm,
             chain_type="refine",
-            question_prompt=self._prompts["summarize_paper"],
-            refine_prompt=self._prompts["summarize_paper_refine"],
+            question_prompt=self._prompts[summarize_prompt],
+            refine_prompt=self._prompts[refine_prompt],
             document_variable_name="text",
             input_key="documents",
             output_key="summary",
         )
 
-        result = llm_chain({"documents": docs})
-
+        result = llm_chain({"documents": docs}, return_only_outputs=True)
         return result["summary"]
+
 
     # def identify_features(self, documents: Union[str, Iterable[str]],
     #                       llm: Optional[BaseLanguageModel] = None):
@@ -948,11 +1033,4 @@ class PaperDatasetLC:
     #         data = parser.parse(response)
     #         yield data
     #
-    #         # TODO: way to update it in Chroma Database
-    #
-    #     # TODO: limit_pages - analyze only 'n' first pages and add keys to whole
-    #     # TODO: skip already added in metadata
-    #     # TODO: Think about extracting 'Abstract' and "Results" to analyze
-    #     # TODO: Maybe scan n_pages after "Abstract" and after "Results"?
-    #
-    #     # TODO: Idea: Keywords can be reduced without llm - just string/set filter
+
