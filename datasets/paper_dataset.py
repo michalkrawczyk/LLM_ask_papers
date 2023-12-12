@@ -699,7 +699,7 @@ class PaperDatasetLC:
         llm: Optional[BaseLanguageModel] = None,
         force_reload: bool = False, pydantic_object: BaseModel = ShortInfoSummary,
     ):
-        parser = PydanticOutputParser(pydantic_object=pydantic_object)
+        parser = PydanticOutputParser(pydantic_object=ShortInfoSummary)
         self.llm_doc_meta_updater(update_key="new_features", prompt="identify_features", predefined_prompt=True,
                                   document_ids=document_ids, llm=llm, force_reload=force_reload, output_parser=parser)
         # """Update document with features detected by LLM model
@@ -766,7 +766,8 @@ class PaperDatasetLC:
 
     def llm_doc_meta_updater(self, update_key: str, prompt: Union[str, PromptTemplate], predefined_prompt: bool = True,
                              document_ids: Union[str, Iterable[str], None] = None, llm: Optional[BaseLanguageModel] = None,
-                             output_parser: Optional[BaseOutputParser] = None, force_reload: bool = False):
+                             output_parser: Optional[BaseOutputParser] = None, force_reload: bool = False,
+                             **var_kwargs):
         """ Update document metadata with answers from LLM model based on predefined prompt questions
 
         Parameters
@@ -794,6 +795,9 @@ class PaperDatasetLC:
 
         force_reload: bool
             If True - Documents with already identified features will be also updated
+
+        var_kwargs: Optional[Dict]
+            Additional variables to pass when invoking prompt
 
         Returns
         -------
@@ -849,7 +853,7 @@ class PaperDatasetLC:
                 logger.warning(f"Document {doc_id} is empty")
                 continue
 
-            metadata[update_key] = chain.invoke({"text": doc_text, "metadata": metadata})
+            metadata[update_key] = chain.invoke({"text": doc_text, **var_kwargs})
             #TODO: check if data is parsed correctly
 
             # Update document in database
