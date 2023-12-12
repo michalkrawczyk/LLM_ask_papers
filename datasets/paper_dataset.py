@@ -823,7 +823,7 @@ class PaperDatasetLC:
                 instructed_prompt.template = instructed_prompt.template + "\n" + output_parser.get_format_instructions()
 
             else:
-                instructed_prompt = prompt.partial(format_instructions=output_parser.get_format_instructions())
+                instructed_prompt = prompt_template.partial(format_instructions=output_parser.get_format_instructions())
 
             chain = instructed_prompt | llm | output_parser
 
