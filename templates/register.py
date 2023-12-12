@@ -1,3 +1,7 @@
+"""Those register functions are provided to quickly register prompts to given prompt holder.
+They're outside PromptHolder class,
+as they are also made as convenient shortcuts to add prompts to default prompt holder.
+"""
 from typing import List, Optional
 
 from langchain.schema import BasePromptTemplate, BaseOutputParser
@@ -14,11 +18,8 @@ def register_prompt(
     prompt_register: PromptHolder = DEFAULT_PROMPT_REGISTER,
     force_reload: bool = False,
 ):
-    if not force_reload and name in prompt_register:
-        # Safer here to raise an error than use possibly wrong prompt
-        raise ValueError(f"Prompt {name} already defined")
-
-    prompt_register.load_defined_prompt(name=name, prompt=prompt)
+    # Note:
+    prompt_register.load_defined_prompt(name=name, prompt=prompt, force_reload=force_reload)
 
 
 def create_and_register_prompt(
