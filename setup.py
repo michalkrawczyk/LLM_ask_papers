@@ -28,5 +28,6 @@ setup(
     install_requires=REQUIREMENTS,
     extras_require={
         "dev": ["pytest", "black"],
+        "hugging_face": ["sentence_transformers"],
     },
 )
