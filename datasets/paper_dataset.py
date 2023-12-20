@@ -1,3 +1,4 @@
+from collections import Mapping
 from enum import Enum
 import logging
 import os
@@ -699,7 +700,7 @@ class PaperDatasetLC:
         llm: Optional[BaseLanguageModel] = None,
         force_reload: bool = False, pydantic_object: BaseModel = ShortInfoSummary,
     ):
-        parser = PydanticOutputParser(pydantic_object=ShortInfoSummary)
+        parser = PydanticOutputParser(pydantic_object=pydantic_object)
         self.llm_doc_meta_updater(update_key="new_features", prompt="identify_features", predefined_prompt=True,
                                   document_ids=document_ids, llm=llm, force_reload=force_reload, output_parser=parser)
         # """Update document with features detected by LLM model
@@ -774,6 +775,9 @@ class PaperDatasetLC:
         ----------
         update_key: str
             Key in metadata to update
+            If output_parser is structured - this will contain generated additional keys in format:
+            {update_key}_{key}
+
         prompt: Union[str, PromptTemplate]
             Prompt to use for updating metadata.
 
@@ -804,6 +808,10 @@ class PaperDatasetLC:
 
         """
         llm: BaseLanguageModel = llm or self._default_llm
+
+        if "." in update_key:
+            logger.warning(f"Update key {update_key} contains dot - this may cause problems"
+                           f" when using structured parser")
 
         if isinstance(prompt, str):
             prompt_template = self._prompts.get(prompt) if predefined_prompt else PromptTemplate(template=prompt)
@@ -853,8 +861,25 @@ class PaperDatasetLC:
                 logger.warning(f"Document {doc_id} is empty")
                 continue
 
-            metadata[update_key] = chain.invoke({"text": doc_text, **var_kwargs})
-            #TODO: check if data is parsed correctly
+            data = chain.invoke({"text": doc_text, **var_kwargs})
+
+            # Metadata cannot contain other values than str, float and int
+            if isinstance(data, (str, float, int)):
+                metadata[update_key] = data
+            elif isinstance(data, bool):
+                metadata[update_key] = int(data)
+            elif isinstance(data, Mapping):
+                added_keys = []
+                for key, value in data.items():
+                    key_name = f"{update_key}.{key}"
+                    metadata[key_name] = value
+                    added_keys.append(key_name)
+
+                # Assumption no key will have comma in name
+                metadata[update_key] = f"metadata keys [{', '.join(added_keys)}]"
+
+            else:
+                metadata[update_key] = str(data)
 
             # Update document in database
             self._db.update_document(

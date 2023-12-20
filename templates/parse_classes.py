@@ -17,6 +17,6 @@ class ShortInfoSummary(BaseModel):
         default=[],
     )
     new_strategies: List[str] = Field(
-        description="New strategies introduced, as keywords", default=[]
+        description="New strategies introduced, as keywords, separated by commas", default=[]
     )
     date: str = Field(description="Date of the paper", default="Unknown")
