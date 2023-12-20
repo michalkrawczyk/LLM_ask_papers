@@ -1,9 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import List
 
+# Note: description in pydentic classes is included in output parser
+
 
 class ShortInfoSummary(BaseModel):
-    """Short summary of the research paper, focused on new features/strategies introduced in the paper"""
     model_name: str = Field(
         description="Name of the model if provided", default="Unknown"
     )
