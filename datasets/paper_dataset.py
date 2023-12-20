@@ -802,10 +802,8 @@ class PaperDatasetLC:
             data = chain.invoke({"text": doc_text, **var_kwargs})
 
             # Metadata cannot contain other values than str, float and int
-            if isinstance(data, (str, float, int)):
+            if isinstance(data, (str, float, int, bool)):
                 metadata[update_key] = data
-            elif isinstance(data, bool):
-                metadata[update_key] = int(data)
             elif data is None:
                 logger.warning(f"Failed to update document {doc_id} - no data returned")
                 metadata[update_key] = "None"
@@ -816,7 +814,7 @@ class PaperDatasetLC:
 
                 for key, value in data_dict.items():
                     key_name = f"{update_key}.{key}"
-                    metadata[key_name] = value if isinstance(value, (str, float, int)) else str(value)
+                    metadata[key_name] = value if isinstance(value, (str, float, int, bool)) else str(value)
                     added_keys.append(key_name)
 
                 metadata[f"{update_key}.cls._type"] = data.__class__.__name__
