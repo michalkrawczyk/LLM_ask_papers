@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from enum import Enum
 import logging
 import os
@@ -868,18 +867,17 @@ class PaperDatasetLC:
                 metadata[update_key] = data
             elif isinstance(data, bool):
                 metadata[update_key] = int(data)
-            elif isinstance(data, Mapping):
-                added_keys = []
+            else:
+                added_keys = ["cls._type"]
+                data = data.dict().update({"cls._type": data.__class__.__name__})
+
                 for key, value in data.items():
                     key_name = f"{update_key}.{key}"
-                    metadata[key_name] = value
+                    metadata[key_name] = value if isinstance(value, (str, float, int)) else str(value)
                     added_keys.append(key_name)
 
-                # Assumption no key will have comma in name
+                # Assumption no key will have comma in name (like in e.g. PydenticOutputParser)
                 metadata[update_key] = f"metadata keys [{', '.join(added_keys)}]"
-
-            else:
-                metadata[update_key] = str(data)
 
             # Update document in database
             self._db.update_document(
