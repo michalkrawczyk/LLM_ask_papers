@@ -702,67 +702,6 @@ class PaperDatasetLC:
         parser = PydanticOutputParser(pydantic_object=pydantic_object)
         self.llm_doc_meta_updater(update_key="new_features", prompt="identify_features", predefined_prompt=True,
                                   document_ids=document_ids, llm=llm, force_reload=force_reload, output_parser=parser)
-        # """Update document with features detected by LLM model
-        #
-        # Parameters
-        # ----------
-        # document_ids: Union[str, Iterable[str]]
-        #     Document ids to update
-        # llm: Optional[BaseLanguageModel]
-        #     LLM model to use. If not provided, default model is used
-        # force_reload: bool
-        #     If True - Documents with already identified features will be also updated
-        #
-        # """
-        # if isinstance(document_ids, str):
-        #     document_ids = [document_ids]
-        #
-        # docs = self.get(ids=document_ids, include=["metadatas", "documents"])
-        #
-        # if not docs:
-        #     logger.warning(f"Documents {document_ids} not found")
-        #     return
-        #
-        # # TODO: move output parser to prompt (with assert that prompt has parser)
-        # parser = PydanticOutputParser(pydantic_object=ShortInfoSummary)
-        #
-        # llm: BaseLanguageModel = llm or self._default_llm
-        # base_prompt: BasePromptTemplate = self._prompts.get("identify_features")
-        #
-        # if self._prompts is None:
-        #     logger.warning("Prompt 'identify_features' is not defined")
-        #     return
-        #
-        # llm_chain = LLMChain(llm=llm, prompt=base_prompt)
-        #
-        # for doc_id, doc_text, metadata in tqdm(
-        #     zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating features"
-        # ):
-        #     if metadata.get("new_features") and not force_reload:
-        #         # Skip already identified documents
-        #         continue
-        #
-        #     if not doc_text:
-        #         # Skip empty documents
-        #         logger.warning(f"Document {doc_id} is empty")
-        #         continue
-        #
-        #     response = llm_chain.predict(
-        #         text=doc_text, format_instructions=parser.get_format_instructions()
-        #     )
-        #
-        #     data = parser.parse(response).dict()
-        #     # Note: Lists are not accepted in metadata
-        #     # TODO: correct metadata by function?
-        #     data.update(
-        #         {k: ", ".join(v) for k, v in data.items() if isinstance(v, list)}
-        #     )
-        #     metadata.update(data)
-        #
-        #     # Update document in database
-        #     self._db.update_document(
-        #         doc_id, Document(page_content=doc_text, metadata=metadata)
-        #     )
 
     def llm_doc_meta_updater(self, update_key: str, prompt: Union[str, PromptTemplate], predefined_prompt: bool = True,
                              document_ids: Union[str, Iterable[str], None] = None, llm: Optional[BaseLanguageModel] = None,
