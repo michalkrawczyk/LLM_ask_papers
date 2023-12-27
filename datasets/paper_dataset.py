@@ -358,7 +358,14 @@ class PaperDatasetLC:
         """Add Multiple documents to vector database"""
         try:
             splited_documents = []
+            current_title, page_number = "", 0
             for doc in tqdm(documents, "Splitting documents"):
+                if not doc.metadata.get("page"):
+                    if current_title == _get_document_name(doc):
+                        page_number = 0
+                    doc.metadata["page"] = page_number
+                    page_number += 1
+
                 splited_documents.extend(self._split_document_by_length(doc))
 
             doc_uuids = self._db.add_documents(splited_documents)
