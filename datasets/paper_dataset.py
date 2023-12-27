@@ -53,9 +53,6 @@ class SearchType(Enum):
 
 class PaperDatasetLC:
     _db: Optional[VectorStore] = None
-    _papers: Dict = (
-        dict()
-    )  # For listing included documents, retrieve whole documents - TODO: remove
     _default_llm: Optional[BaseLanguageModel] = None
     _prompts: PromptHolder = DEFAULT_PROMPT_REGISTER
 
@@ -180,7 +177,6 @@ class PaperDatasetLC:
 
         try:
             doc_uuids = self._db.add_documents(documents)
-            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, documents)})
 
             return doc_uuids
 
@@ -226,7 +222,6 @@ class PaperDatasetLC:
                             page.metadata[key] = metadata["key"]
 
             doc_uuids = self._db.add_documents(data)
-            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, data)})
 
             return doc_uuids
 
@@ -293,9 +288,6 @@ class PaperDatasetLC:
 
             try:
                 doc_uuids = self._db.add_documents(valid_records)
-                self._papers.update(
-                    {uid: doc for uid, doc in zip(doc_uuids, valid_records)}
-                )
 
                 return doc_uuids
 
@@ -325,7 +317,6 @@ class PaperDatasetLC:
             docs = retriever.get_documents_by_id(id_list)  # type: ignore
 
             doc_uuids = self.add_documents(docs)
-            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, docs)})
 
             return doc_uuids
 
@@ -356,7 +347,6 @@ class PaperDatasetLC:
             docs = retriever.get_relevant_documents(query)
             doc_uuids = self.add_documents(docs)
 
-            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, docs)})
             return doc_uuids
 
         except Exception as err:
@@ -372,7 +362,6 @@ class PaperDatasetLC:
                 splited_documents.extend(self._split_document_by_length(doc))
 
             doc_uuids = self._db.add_documents(splited_documents)
-            self._papers.update({uid: doc for uid, doc in zip(doc_uuids, documents)})
             return doc_uuids
 
         except Exception as err:
@@ -687,12 +676,6 @@ class PaperDatasetLC:
         result = chain({"query": query})
         return result["result"], result.get("source_documents", None)
 
-    # def filter_by_categories(self, category: Union[Tuple[str], str]):
-    # TODO:
-    #     pass
-
-    # def get_as_documents(self, **kwargs):
-
     def update_document_features(
         self,
         document_ids: Union[str, Iterable[str]] = None,
@@ -801,7 +784,7 @@ class PaperDatasetLC:
 
             data = chain.invoke({"text": doc_text, **var_kwargs})
 
-            # Metadata cannot contain other values than str, float and int
+            # Metadata cannot contain other values than str, bool and int
             if isinstance(data, (str, float, int, bool)):
                 metadata[update_key] = data
             elif data is None:
@@ -975,31 +958,3 @@ class PaperDatasetLC:
 
         result = llm_chain({"documents": docs}, return_only_outputs=True)
         return result["summary"]
-
-
-    # def identify_features(self, documents: Union[str, Iterable[str]],
-    #                       llm: Optional[BaseLanguageModel] = None):
-    #
-    #     # Note: Each document should identify separately, even from same paper
-    #
-    #     if isinstance(documents, str):
-    #         documents = [documents]
-    #
-    #     parser = PydanticOutputParser(pydantic_object=ShortInfoSummary)
-    #
-    #     llm: BaseLanguageModel = llm or self._default_llm
-    #     base_prompt: BasePromptTemplate = DEFAULT_PROMPT_REGISTER["identify_features"]
-    #     llm_chain = LLMChain(llm=llm, prompt=base_prompt)
-    #
-    #     for doc in tqdm(documents, desc="Identifying features"):
-    #         # if not force_reload and doc.metadata.get("new_features"):
-    #         #     # Skip already identified documents
-    #         #     continue
-    #
-    #         # response = llm_chain.predict_and_parse(text=doc)
-    #         response = llm_chain.predict(text=doc, format_instructions=parser.get_format_instructions())
-    #
-    #         data = parser.parse(response)
-    #         yield data
-    #
-
