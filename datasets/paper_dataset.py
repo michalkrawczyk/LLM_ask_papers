@@ -20,29 +20,9 @@ from arxiv_utils import (
     ExtendedArxivRetriever,
 )
 from templates import ShortInfoSummary, DEFAULT_PROMPT_REGISTER, PromptHolder
+from utils import check_same_doc, get_document_name,  split_docs, SplitType
 
 logger = logging.getLogger(__name__)
-
-
-def _get_document_name(document: Union[Document, Dict]) -> str:
-    """Get name of document (Title or source)"""
-    if isinstance(document, Document):
-        meta = document.metadata
-    else:
-        meta = document
-
-    if meta:
-        title = meta.get("title")
-        name = None
-
-        if not title or title == "Unknown Text":
-            name = meta.get("source") or meta.get("file_path")
-            name = os.path.basename(name)
-
-        if name or title:
-            return f"{name or title} - page: {meta.get('page', 0)}"
-
-    return "Unknown"
 
 
 class SearchType(Enum):
@@ -55,13 +35,17 @@ class PaperDatasetLC:
     _db: Optional[VectorStore] = None
     _default_llm: Optional[BaseLanguageModel] = None
     _prompts: PromptHolder = DEFAULT_PROMPT_REGISTER
+    _split_type: SplitType = SplitType.SECTION
 
     _feature_list: Optional[List[str]] = None  # meta private
-    max_num_words = 1500  # TODO: method to take from llm and setters
+    max_num_words = 300  # TODO: method to take from llm and setters
 
     def __init__(
-        self, db: Optional[VectorStore] = None, llm: Optional[BaseLanguageModel] = None
+        self, db: Optional[VectorStore] = None, llm: Optional[BaseLanguageModel] = None,
+            doc_split_type: SplitType = SplitType.SECTION
     ):
+        self._split_type = doc_split_type
+
         if not db:
             import openai
             from langchain.llms.openai import OpenAI
@@ -110,44 +94,44 @@ class PaperDatasetLC:
                     f" Some functions using it, may not work or require changing prompt in parameters "
                 )
 
-    def _split_document_by_length(self, document: Document) -> List[Document]:
-        """Split document by max_num_words"""
-        regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
-
-        word_count = len(document.page_content.split(" "))
-
-        if word_count > self.max_num_words:
-            documents = []
-            # Search for sections
-            regex_matches = re.findall(regex, document.page_content)
-
-            if (len(regex_matches) + 1) >= word_count / self.max_num_words:
-                # Split by found sections
-                for match, text in zip(
-                    regex_matches, re.split(regex, document.page_content)
-                ):
-                    documents.append(
-                        Document(
-                            page_content=match + " " + text, metadata=document.metadata
-                        )
-                    )
-            else:
-                words = document.page_content.split(" ")
-                last_index = 0
-                for i in range(1, len(words), self.max_num_words):
-                    documents.append(
-                        Document(
-                            page_content=" ".join(
-                                words[last_index : i * self.max_num_words]
-                            ),
-                            metadata=document.metadata,
-                        )
-                    )
-                    last_index = i
-        else:
-            documents = [document]
-
-        return documents
+    # def _split_document_by_length(self, document: Document) -> List[Document]:
+    #     """Split document by max_num_words"""
+    #     regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
+    #
+    #     word_count = len(document.page_content.split(" "))
+    #
+    #     if word_count > self.max_num_words:
+    #         documents = []
+    #         # Search for sections
+    #         regex_matches = re.findall(regex, document.page_content)
+    #
+    #         if (len(regex_matches) + 1) >= word_count / self.max_num_words:
+    #             # Split by found sections
+    #             for match, text in zip(
+    #                 regex_matches, re.split(regex, document.page_content)
+    #             ):
+    #                 documents.append(
+    #                     Document(
+    #                         page_content=match + " " + text, metadata=document.metadata
+    #                     )
+    #                 )
+    #         else:
+    #             words = document.page_content.split(" ")
+    #             last_index = 0
+    #             for i in range(1, len(words), self.max_num_words):
+    #                 documents.append(
+    #                     Document(
+    #                         page_content=" ".join(
+    #                             words[last_index : i * self.max_num_words]
+    #                         ),
+    #                         metadata=document.metadata,
+    #                     )
+    #                 )
+    #                 last_index = i
+    #     else:
+    #         documents = [document]
+    #
+    #     return documents
 
     def add_document(
         self, document: Document, metadata: Optional[Dict] = None
@@ -173,7 +157,7 @@ class PaperDatasetLC:
                     # Add missing data
                     document.metadata[key] = metadata["key"]
 
-        documents = self._split_document_by_length(document)
+        documents = split_docs([document], max_words=self.max_num_words, split_type=self._split_type)
 
         try:
             doc_uuids = self._db.add_documents(documents)
@@ -208,11 +192,11 @@ class PaperDatasetLC:
             f" for file: {filepath}"
 
         try:
-            data = []
+            data = split_docs(PyMuPDFLoader(filepath).load(), max_words=self.max_num_words, split_type=self._split_type)
 
-            for doc in tqdm(PyMuPDFLoader(filepath).load(), desc="Loading pdf pages"):
-                split_docs = self._split_document_by_length(doc)
-                data.extend(split_docs)
+            # for doc in tqdm(PyMuPDFLoader(filepath).load(), desc="Loading pdf pages"):
+            #     split_docs = self._split_document_by_length(doc)
+            #     data.extend(split_docs)
 
             if metadata:
                 for page in data:
@@ -272,9 +256,8 @@ class PaperDatasetLC:
                     meta["title"] = "Unknown Text"
 
                 valid_records.extend(
-                    self._split_document_by_length(
-                        Document(page_content=text, metadata=meta)
-                    )
+                    split_docs([Document(page_content=text, metadata=meta)],
+                               max_words=self.max_num_words, split_type=self._split_type)
                 )
 
             except ValueError as err:
@@ -356,17 +339,26 @@ class PaperDatasetLC:
 
     def add_documents(self, documents: List[Document]) -> List[str]:
         """Add Multiple documents to vector database"""
+        grouped_docs = []
+
+        for i, doc in enumerate(documents):
+            if i == 0:
+                grouped_docs.append([doc])
+                continue
+
+            # if doc.metadata.get("source") == documents[i - 1].metadata.get("source"):
+            if check_same_doc([doc, documents[i - 1]]):
+                # Same source will be grouped for splitting
+                grouped_docs[-1].append(doc)
+            else:
+                grouped_docs.append([doc])
+
         try:
             splited_documents = []
-            current_title, page_number = "", 0
-            for doc in tqdm(documents, "Splitting documents"):
-                if not doc.metadata.get("page"):
-                    if current_title == _get_document_name(doc):
-                        page_number = 0
-                    doc.metadata["page"] = page_number
-                    page_number += 1
 
-                splited_documents.extend(self._split_document_by_length(doc))
+            for doc_group in grouped_docs:
+                splited_documents.extend(
+                    split_docs(doc_group, max_words=self.max_num_words, split_type=self._split_type))
 
             doc_uuids = self._db.add_documents(splited_documents)
             return doc_uuids
@@ -415,7 +407,7 @@ class PaperDatasetLC:
         return [
             (doc_id, doc)
             for doc_id, doc in zip(
-                documents["ids"], map(_get_document_name, documents["metadatas"])
+                documents["ids"], map(get_document_name, documents["metadatas"])
             )
         ]
 
