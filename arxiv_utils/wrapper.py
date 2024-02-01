@@ -1,5 +1,9 @@
 # langchain/utilities/arxiv.py
 # Indexes/Retrievers/Arxiv
+import logging
+from typing import Dict, List, Union, Any
+import os
+
 from arxiv import (
     Search,
     SortCriterion,
@@ -14,10 +18,6 @@ from pydantic import BaseModel, root_validator
 from tqdm import tqdm
 
 from .download_papers import _clean_filename_str
-
-import logging
-from typing import Dict, List, Union, Any
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,9 @@ class ArxivAPIWrapper2(BaseModel):
             If set to True: Existing pdf files will be ignored and new ones will be downloaded
             Else: Will use existing files downloaded earlier
 
+        separate_pages:
+            If set to True: Each page of pdf file will be treated as separate document
+
 
     """
 
@@ -89,6 +92,7 @@ class ArxivAPIWrapper2(BaseModel):
     save_pdf: bool = True
     file_save_dir: str = "."
     overwrite_existing: bool = False
+    separate_pages: bool = False
 
     # verbose: bool = False
 
@@ -176,7 +180,11 @@ class ArxivAPIWrapper2(BaseModel):
                     logger.info(f"File Already Exist: {paper_filepath}")
 
                 with fitz.open(file_path) as f:
-                    text: str = "".join(page.get_text() for page in f)
+                    texts = (
+                        [page.get_text() for page in f]
+                        if self.separate_pages
+                        else ["".join(page.get_text() for page in f)]
+                    )
 
             except FileNotFoundError as err:
                 logger.warning(err)
@@ -192,6 +200,7 @@ class ArxivAPIWrapper2(BaseModel):
                     "primary_category": result.primary_category,
                     "categories": result.categories,
                     "links": [link.href for link in result.links],
+                    "pdf_url": result.pdf_url,
                 }
             else:
                 extra_metadata = {}
@@ -200,14 +209,20 @@ class ArxivAPIWrapper2(BaseModel):
                 "source": f"[{result.entry_id}] {result.title}",
                 "authors": ", ".join(a.name for a in result.authors),
                 "summary": result.summary,
-                "published": str(result.updated.date()),
+                "published": str(result.publised.date()),
+                "date": str(result.updated.date()),
                 "file_path": paper_filepath if already_exist or self.save_pdf else "",
                 **extra_metadata,
             }
-            doc = Document(
-                page_content=text[: self.doc_content_chars_max], metadata=metadata
-            )
-            docs.append(doc)
+
+            for idx, text in enumerate(texts):
+                metadata["page"] = (
+                    len(texts) - 1 and idx
+                )  # Set page 0 if only one page, to mark whole document
+                doc = Document(
+                    page_content=text[: self.doc_content_chars_max], metadata=metadata
+                )
+                docs.append(doc)
 
             if not self.save_pdf:
                 os.remove(file_path)
