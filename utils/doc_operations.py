@@ -4,14 +4,12 @@ import os
 from typing import List, Union, Dict
 
 from langchain.schema import Document
-#TODO: Not allow split documents if have different title or source
 
 
 class SplitType(Enum):
     # Enum to allow extending split operations
     PARAGRAPH = 0
     SECTION = 1
-
 
 
 def get_document_name(document: Union[Document, Dict]) -> str:
@@ -39,6 +37,7 @@ def check_same_doc(documents: List[Document]):
     """ Check if all documents come from the same source (title or source)"""
     doc_names = [doc.metadata.get("source", doc.metadata.get("title")) for doc in documents]
     return len(set(doc_names)) == 1
+
 
 def locate_metadata(documents: List[Document], pages_end_idx: List[int], search_idx: int):
     """ Locate metadata for given text index
@@ -128,6 +127,9 @@ def split_docs(documents: List[Document], max_words: int = 300, split_type: Spli
         SplitType.SECTION: split_by_sections
     }
 
+    if not check_same_doc(documents):
+        raise ValueError("All documents must come from the same source (title or source)")
+
     split_documents = []
     merged_text = " ".join([doc.page_content for doc in documents])
     pages_length = [len(doc.page_content) for doc in documents]
@@ -155,7 +157,6 @@ def split_docs(documents: List[Document], max_words: int = 300, split_type: Spli
 
             split_documents.extend(([Document(page_content=" ".join(batch), metadata=doc_metadata)
                                      for batch in text_batches]))
-            split_documents.extend([" ".join(batch) for batch in text_batches])
 
     return split_documents
 
