@@ -209,7 +209,7 @@ class ArxivAPIWrapper2(BaseModel):
                 "source": f"[{result.entry_id}] {result.title}",
                 "authors": ", ".join(a.name for a in result.authors),
                 "summary": result.summary,
-                "published": str(result.publised.date()),
+                "published": str(result.published.date()),
                 "date": str(result.updated.date()),
                 "file_path": paper_filepath if already_exist or self.save_pdf else "",
                 **extra_metadata,
