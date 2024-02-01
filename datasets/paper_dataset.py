@@ -8,7 +8,7 @@ from langchain.base_language import BaseLanguageModel
 from langchain.chains import LLMChain, RetrievalQA
 from langchain.chains.summarize import load_summarize_chain
 from langchain.document_loaders import PyMuPDFLoader
-from langchain.embeddings.openai import OpenAIEmbeddings
+
 from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import Document, BaseOutputParser
 from langchain.vectorstores import Chroma, VectorStore
@@ -45,35 +45,25 @@ class PaperDatasetLC:
             doc_split_type: SplitType = SplitType.SECTION
     ):
         self._split_type = doc_split_type
+        self._db = db
+        self._default_llm = llm
 
-        if not db:
-            import openai
-            from langchain.llms.openai import OpenAI
-
-            if llm:
-                raise ValueError(
-                    "PaperDatasetLC cannot be instantiated "
-                    "if only llm model is given,"
-                    " without proper embeddings in data storage"
-                )
-
-            logger.info(
-                "Dataset with not specified db" " - using Chroma with OpenAI embeddings"
+        if not self._db or not isinstance(self._db, VectorStore):
+            logger.warning(
+                "Dataset with not specified or invalid database" " - using Chroma with OpenAI embeddings and LLM"
             )
-            self._db = Chroma(
-                embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key)
-            )
-            self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
+            try:
+                import openai
+                from langchain.llms.openai import OpenAI
+                from langchain.embeddings.openai import OpenAIEmbeddings
 
-        else:
-            self._db = db
-            self._default_llm = llm
-
-            if self._default_llm:
-                logger.warning(
-                    "LLM model not provided -"
-                    " search functions requiring it will not be available"
+                self._db = Chroma(
+                    embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key)
                 )
+                self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
+
+            except ImportError as err:
+                logger.error(f"Failed to import OpenAI and dependencies: {err}")
 
         for prompt_name in [
             "summarize_doc",
@@ -165,7 +155,7 @@ class PaperDatasetLC:
             return doc_uuids
 
         except Exception as err:
-            logger.info(
+            logger.warning(
                 f"Failed to add Document {document.metadata.get('title', 'Unnamed Document')} \n"
                 f"  {err}"
             )
@@ -210,7 +200,7 @@ class PaperDatasetLC:
             return doc_uuids
 
         except Exception as err:
-            logger.info(f"Failed to add Document {filepath} \n" f"  {err}")
+            logger.warning(f"Failed to add Document {filepath} \n" f"  {err}")
             return []  # No Object added - return empty list
 
     def add_texts(
@@ -238,7 +228,7 @@ class PaperDatasetLC:
             if len(texts) != len(metadatas):  # type: ignore
                 raise ValueError("Number of metadata object must match number of texts")
         except ValueError as err:
-            logger.info(f"Failed to add texts to dataset: {err}")
+            logger.warning(f"Failed to add texts to dataset: {err}")
             return []  # No Object added - return empty list
         # TODO: split texts by max_num_words
 
@@ -261,7 +251,7 @@ class PaperDatasetLC:
                 )
 
             except ValueError as err:
-                logger.info(err)
+                logger.warning(err)
 
                 if not skip_invalid:
                     logger.info(
@@ -275,7 +265,7 @@ class PaperDatasetLC:
                 return doc_uuids
 
             except Exception as err:
-                logger.info(f"Failed to add texts \n" f"  {err}")
+                logger.warning(f"Failed to add texts \n" f"  {err}")
                 return []  # No Object added - return empty list
 
     def add_papers_by_id(self, id_list: Iterable[str], **kwargs: Any) -> List[str]:
@@ -304,7 +294,7 @@ class PaperDatasetLC:
             return doc_uuids
 
         except Exception as err:
-            logger.info(f"Failed to add papers: {err}")
+            logger.warning(f"Failed to add papers: {err}")
 
         return []  # No Object added - return empty list
 
@@ -333,7 +323,7 @@ class PaperDatasetLC:
             return doc_uuids
 
         except Exception as err:
-            logger.info(f"Failed to add documents: {err}")
+            logger.warning(f"Failed to add documents: {err}")
 
         return []  # No Object added - return empty list
 
@@ -364,7 +354,7 @@ class PaperDatasetLC:
             return doc_uuids
 
         except Exception as err:
-            logger.info(f"Failed to add documents: {err}")
+            logger.warning(f"Failed to add documents: {err}")
 
         return []  # No Object added - return empty list
 
@@ -599,7 +589,8 @@ class PaperDatasetLC:
         """
         if db_filter and not isinstance(self._db, Chroma):
             logger.warning(
-                "Filter option was not tested for other vector storages and may not work with other databases than Chroma"
+                "Filter option was not tested for other vector storages and "
+                "may not work with other databases than Chroma"
             )
 
         return self._db.similarity_search_with_relevance_scores(
