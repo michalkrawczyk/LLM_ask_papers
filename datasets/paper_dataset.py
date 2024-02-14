@@ -42,9 +42,10 @@ class PaperDatasetLC:
 
     def __init__(
         self, db: Optional[VectorStore] = None, llm: Optional[BaseLanguageModel] = None,
-            doc_split_type: SplitType = SplitType.SECTION
+            doc_split_type: SplitType = SplitType.SECTION, max_num_words: int = 300
     ):
         self._split_type = doc_split_type
+        self.max_num_words = max_num_words
         self._db = db
         self._default_llm = llm
 
@@ -259,14 +260,14 @@ class PaperDatasetLC:
                     )
                     return []  # No Object added - return empty list
 
-            try:
-                doc_uuids = self._db.add_documents(valid_records)
+        try:
+            doc_uuids = self._db.add_documents(valid_records) if valid_records else []
 
-                return doc_uuids
+            return doc_uuids
 
-            except Exception as err:
-                logger.warning(f"Failed to add texts \n" f"  {err}")
-                return []  # No Object added - return empty list
+        except Exception as err:
+            logger.warning(f"Failed to add texts \n" f"  {err}")
+            return []  # No Object added - return empty list
 
     def add_papers_by_id(self, id_list: Iterable[str], **kwargs: Any) -> List[str]:
         """Search on arxiv papers by ID and add them to vector database
@@ -384,7 +385,7 @@ class PaperDatasetLC:
             fields = [meta.get(field, "") for field in ["title", "source", "file_path"]]
 
             if not regex_filter or any(
-                re.match(regex_filter, field) for field in fields
+                re.search(regex_filter, field) for field in fields
             ):
                 document_set.add(tuple(fields))
 
@@ -891,9 +892,7 @@ class PaperDatasetLC:
         for i, doc_meta in enumerate(
             tqdm(documents["metadatas"], desc="Searching documents")
         ):
-            if re.match(search_value, doc_meta["title"]) or re.match(
-                search_value, doc_meta["source"]
-            ):
+            if re.search(search_value, doc_meta.get("title", "") + " " + doc_meta.get("source", "")):
                 found_ids.append(documents["ids"][i])
 
         return self.get(ids=found_ids if found_ids else [""], include=include)
