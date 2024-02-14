@@ -78,7 +78,7 @@ def split_by_sections(text: str):
     """
     regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
     match_patterns = re.compile(regex)
-    separate_txt_idx = [0] + [match.end() for match in match_patterns.finditer(text)]
+    separate_txt_idx = [0] + [match.end() for match in match_patterns.finditer(text)] + [len(text)]
 
     return separate_txt_idx
 
@@ -99,7 +99,7 @@ def split_by_paragraphs(text: str):
         """
     regex = r"\w+[.]\n+"    # split by dot and new line
     match_patterns = re.compile(regex)
-    separate_txt_idx = [0] + [match.end() for match in match_patterns.finditer(text)]
+    separate_txt_idx = [0] + [match.end() for match in match_patterns.finditer(text)] + [len(text)]
 
     return separate_txt_idx
 
