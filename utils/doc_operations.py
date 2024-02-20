@@ -56,7 +56,11 @@ def locate_metadata(documents: List[Document], pages_end_idx: List[int], search_
 
     """
     last_idx = 0
-    while search_idx < pages_end_idx[last_idx]:
+
+    if len(documents) != len(pages_end_idx):
+        raise ValueError("Documents and pages_end_idx must have the same length")
+
+    while search_idx > pages_end_idx[last_idx]:
         last_idx += 1
 
     return documents[last_idx].metadata
@@ -132,31 +136,38 @@ def split_docs(documents: List[Document], max_words: int = 300, split_type: Spli
 
     split_documents = []
     merged_text = " ".join([doc.page_content for doc in documents])
-    pages_length = [len(doc.page_content) for doc in documents]
-    pages_end_idx = [sum(pages_length[:i]) for i in range(len(pages_length))]
+    pages_lengths = [len(doc.page_content) + 1 for doc in documents]
+    pages_lengths[-1] -= 1  # remove additional space at the end of merged text
 
-    separate_txt_idx = split_op.get(split_type, split_by_sections)(merged_text)
-    # TODO: max_words doesn't work properly
+    pages_end_idx = [sum(pages_lengths[:i + 1]) for i in range(len(pages_lengths))]
 
-    for i, txt_idx in enumerate(separate_txt_idx[1:]):
+    separate_txt_indices = split_op.get(split_type, split_by_sections)(merged_text)
 
-        if txt_idx - separate_txt_idx[i - 1] <= max_words:
-            # if concatenated text is smaller than max_words, add it to list
-            # merged_text.append(text[separate_txt_idx[i - 1]: txt_idx])
-            doc_metadata = locate_metadata(documents, pages_end_idx, txt_idx)
-            split_documents.append(Document(page_content=merged_text[separate_txt_idx[i - 1]: txt_idx],
-                                            metadata=doc_metadata))
+    for i, txt_idx in enumerate(separate_txt_indices[1:], 1):
+        chunk_to_split = merged_text[separate_txt_indices[i - 1]: txt_idx].split(" ")
+        begin_txt_idx = separate_txt_indices[i - 1]
+
+        # check if concatenated text is smaller than max_words
+        if len(chunk_to_split) <= max_words:
+            doc_metadata = locate_metadata(documents, pages_end_idx, begin_txt_idx)
+            split_documents.append(
+                Document(page_content=merged_text[begin_txt_idx: txt_idx],
+                         metadata=doc_metadata))
 
         else:
-            # split chunk into smaller batches with size of max_words
-            # Note: This may cut sentences,
-            chunk_to_split = merged_text[separate_txt_idx[i - 1]: txt_idx].split(" ")
-            text_batches = [chunk_to_split[j: j + max_words] for j in range(0, len(chunk_to_split), max_words)]
-            # TODO: Check if need locating for each batch
-            doc_metadata = locate_metadata(documents, pages_end_idx, txt_idx)
+            batch_word_indices = [j for j in range(0, len(chunk_to_split), max_words)] + [len(chunk_to_split)]
+            previous_end_idx = 0
 
-            split_documents.extend(([Document(page_content=" ".join(batch), metadata=doc_metadata)
-                                     for batch in text_batches]))
+            for batch_idx in range(len(batch_word_indices) - 1):
+                text = " ".join(chunk_to_split[batch_word_indices[batch_idx]: batch_word_indices[batch_idx + 1]])
+                metadata = locate_metadata(documents, pages_end_idx,
+                                           begin_txt_idx + previous_end_idx)
+                split_documents.append(Document(page_content=text, metadata=metadata))
+                previous_end_idx += len(text) + 1
+
+    for i, doc in enumerate(split_documents):
+        # Add split part number to metadata
+        doc.metadata["split_part"] = i
 
     return split_documents
 

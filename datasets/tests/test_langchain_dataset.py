@@ -1,5 +1,4 @@
 import pytest
-import os
 import yaml
 from pathlib import Path
 
@@ -8,6 +7,8 @@ from langchain.vectorstores import Chroma
 #TODO: embeddings and dataset same for all test units?
 
 from datasets import PaperDatasetLC
+from utils.doc_operations import SplitType
+
 ROOT_PATH = Path(__file__).resolve().parents[2]
 
 try:
@@ -32,16 +33,16 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 
-@pytest.mark.skipif(not (SENTENCE_TRANSFORMERS_AVAILABLE and OPENAI_AVAILABLE), reason="Not found any llm module")
+@pytest.mark.skipif(not (SENTENCE_TRANSFORMERS_AVAILABLE or OPENAI_AVAILABLE), reason="Not found any llm module")
 def test_document_storage():
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L12-v2") \
         if SENTENCE_TRANSFORMERS_AVAILABLE else (
         OpenAIEmbeddings(openai_api_key=openai.api_key, model="text-embedding-ada-002"))
 
-    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings))
+    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings), doc_split_type=SplitType.SECTION)
     # add documents
     dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
-    sample_text = ["Lorem impsum something something", "Some Text"]
+    sample_text = ["Lorem impsum something something", "Some Other Text"]
     sample_metas = [{"source": "sth", "v": "test"}, {"other": "sth"}]
     # ^ second one should be ignored due to not specified source
     assert len(
@@ -50,7 +51,7 @@ def test_document_storage():
     # Listing documents
     stored_docs = dataset.list_documents_by_id()
 
-    assert len(stored_docs) == 6, "Invalid length from 'list_documents_by_id'"  # 5 from pdf + one text
+    assert len(stored_docs) == 17, "Invalid length from 'list_documents_by_id'"  # 14 from pdf + one text
     print(dataset.unique_list_of_documents())
 
     assert len(dataset.unique_list_of_documents()) == 2, \

@@ -85,45 +85,6 @@ class PaperDatasetLC:
                     f" Some functions using it, may not work or require changing prompt in parameters "
                 )
 
-    # def _split_document_by_length(self, document: Document) -> List[Document]:
-    #     """Split document by max_num_words"""
-    #     regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
-    #
-    #     word_count = len(document.page_content.split(" "))
-    #
-    #     if word_count > self.max_num_words:
-    #         documents = []
-    #         # Search for sections
-    #         regex_matches = re.findall(regex, document.page_content)
-    #
-    #         if (len(regex_matches) + 1) >= word_count / self.max_num_words:
-    #             # Split by found sections
-    #             for match, text in zip(
-    #                 regex_matches, re.split(regex, document.page_content)
-    #             ):
-    #                 documents.append(
-    #                     Document(
-    #                         page_content=match + " " + text, metadata=document.metadata
-    #                     )
-    #                 )
-    #         else:
-    #             words = document.page_content.split(" ")
-    #             last_index = 0
-    #             for i in range(1, len(words), self.max_num_words):
-    #                 documents.append(
-    #                     Document(
-    #                         page_content=" ".join(
-    #                             words[last_index : i * self.max_num_words]
-    #                         ),
-    #                         metadata=document.metadata,
-    #                     )
-    #                 )
-    #                 last_index = i
-    #     else:
-    #         documents = [document]
-    #
-    #     return documents
-
     def add_document(
         self, document: Document, metadata: Optional[Dict] = None
     ) -> List[str]:
