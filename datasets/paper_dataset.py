@@ -32,7 +32,7 @@ class SearchType(Enum):
 
 
 class PaperDatasetLC:
-    _db: Optional[VectorStore] = None
+    _db: Optional[Chroma] = None
     _default_llm: Optional[BaseLanguageModel] = None
     _prompts: PromptHolder = DEFAULT_PROMPT_REGISTER
     _split_type: SplitType = SplitType.SECTION
@@ -41,7 +41,7 @@ class PaperDatasetLC:
     max_num_words = 300  # TODO: method to take from llm and setters
 
     def __init__(
-        self, db: Optional[VectorStore] = None, llm: Optional[BaseLanguageModel] = None,
+        self, db: Optional[Chroma] = None, llm: Optional[BaseLanguageModel] = None,
             doc_split_type: SplitType = SplitType.SECTION, max_num_words: int = 300
     ):
         self._split_type = doc_split_type
@@ -59,7 +59,8 @@ class PaperDatasetLC:
                 from langchain.embeddings.openai import OpenAIEmbeddings
 
                 self._db = Chroma(
-                    embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key)
+                    embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key),
+                    collection_metadata={"hnsw:space": "cosine"}
                 )
                 self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
 
@@ -682,9 +683,14 @@ class PaperDatasetLC:
         """
         llm: BaseLanguageModel = llm or self._default_llm
 
+        if not update_key or update_key in ("title", "source", "file_path", "date", "date_int", "page", "total_pages",
+                                            "author", "creationDate", "split_part"):
+            logger.error(f"Update key {update_key} is not allowed")
+            return
+
         if "." in update_key:
-            logger.warning(f"Update key {update_key} contains dot - this may cause problems"
-                           f" when using structured parser")
+            logger.error(f"Update key {update_key} containing dot is restricted to substructures")
+            return
 
         if isinstance(prompt, str):
             prompt_template = self._prompts.get(prompt) if predefined_prompt else PromptTemplate(template=prompt)
@@ -694,12 +700,12 @@ class PaperDatasetLC:
             prompt_template = prompt
 
         if prompt_template is None:
-            logger.warning(f"Failed to find prompt - probably not defined")
+            logger.error(f"Failed to find prompt - probably not defined")
             return
 
         if "text" not in prompt_template.input_variables:
             #
-            logger.warning(f"Prompt {prompt_template.name} has no 'text' variable")
+            logger.error(f"Prompt {prompt_template.name} has no 'text' variable")
             return
 
         if output_parser:
@@ -718,7 +724,7 @@ class PaperDatasetLC:
         docs = self.get(ids=document_ids, include=["metadatas", "documents"])
 
         if not docs:
-            logger.warning(f"Documents {document_ids} not found")
+            logger.error(f"Documents {document_ids} not found")
             return
 
         for doc_id, doc_text, metadata in tqdm(
@@ -885,12 +891,12 @@ class PaperDatasetLC:
         llm: BaseLanguageModel = llm or self._default_llm
 
         if not docs:
-            logger.warning(f"Documents {document_ids} not found")
+            logger.error(f"Documents {document_ids} not found")
             return
 
         for prompt_name in [summarize_prompt, refine_prompt]:
             if prompt_name not in self._prompts:
-                logger.warning(
+                logger.error(
                     f"Prompt {prompt_name} not defined -"
                     f" Unable to summarize documents"
                 )

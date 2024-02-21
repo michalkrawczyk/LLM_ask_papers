@@ -39,7 +39,8 @@ def test_document_storage():
         if SENTENCE_TRANSFORMERS_AVAILABLE else (
         OpenAIEmbeddings(openai_api_key=openai.api_key, model="text-embedding-ada-002"))
 
-    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings), doc_split_type=SplitType.SECTION)
+    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings, collection_metadata={"hnsw:space": "cosine"}),
+                             doc_split_type=SplitType.SECTION)
     # add documents
     dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
     sample_text = ["Lorem impsum something something", "Some Other Text"]
@@ -103,7 +104,8 @@ def test_llm():
     model = ChatOpenAI(openai_api_key=openai.api_key, model=model_name)
     # chain = LLMChain(llm=model, prompt=prompt)
 
-    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings), llm=model)
+    dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings, collection_metadata={"hnsw:space": "cosine"}),
+                             llm=model)
 
     docs_ids = dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
 
