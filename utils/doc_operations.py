@@ -34,13 +34,17 @@ def get_document_name(document: Union[Document, Dict]) -> str:
 
 
 def check_same_doc(documents: List[Document]):
-    """ Check if all documents come from the same source (title or source)"""
-    doc_names = [doc.metadata.get("source", doc.metadata.get("title")) for doc in documents]
+    """Check if all documents come from the same source (title or source)"""
+    doc_names = [
+        doc.metadata.get("source", doc.metadata.get("title")) for doc in documents
+    ]
     return len(set(doc_names)) == 1
 
 
-def locate_metadata(documents: List[Document], pages_end_idx: List[int], search_idx: int):
-    """ Locate metadata for given text index
+def locate_metadata(
+    documents: List[Document], pages_end_idx: List[int], search_idx: int
+):
+    """Locate metadata for given text index
 
     Parameters
     ----------
@@ -67,7 +71,7 @@ def locate_metadata(documents: List[Document], pages_end_idx: List[int], search_
 
 
 def split_by_sections(text: str):
-    """ Split text into sections
+    """Split text into sections
 
     Parameters
     ----------
@@ -82,34 +86,42 @@ def split_by_sections(text: str):
     """
     regex = r"\n+[A-Z0-9.]{1,5}[.:][\t ]?[A-Z][\w -]{4,}\n+"
     match_patterns = re.compile(regex)
-    separate_txt_idx = [0] + [match.end() for match in match_patterns.finditer(text)] + [len(text)]
+    separate_txt_idx = (
+        [0] + [match.end() for match in match_patterns.finditer(text)] + [len(text)]
+    )
 
     return separate_txt_idx
 
 
 def split_by_paragraphs(text: str):
-    """ Split text into paragraphs
+    """Split text into paragraphs
 
-        Parameters
-        ----------
-        text: str
-            Text to split
+    Parameters
+    ----------
+    text: str
+        Text to split
 
-        Returns
-        -------
-        List[int]
-            List of indexes where text should be split
+    Returns
+    -------
+    List[int]
+        List of indexes where text should be split
 
-        """
-    regex = r"\w+[.]\n+"    # split by dot and new line
+    """
+    regex = r"\w+[.]\n+"  # split by dot and new line
     match_patterns = re.compile(regex)
-    separate_txt_idx = [0] + [match.end() for match in match_patterns.finditer(text)] + [len(text)]
+    separate_txt_idx = (
+        [0] + [match.end() for match in match_patterns.finditer(text)] + [len(text)]
+    )
 
     return separate_txt_idx
 
 
-def split_docs(documents: List[Document], max_words: int = 300, split_type: SplitType = SplitType.PARAGRAPH):
-    """ Split documents into paragraphs or chunks of max_words size if paragraph is too long
+def split_docs(
+    documents: List[Document],
+    max_words: int = 300,
+    split_type: SplitType = SplitType.PARAGRAPH,
+):
+    """Split documents into paragraphs or chunks of max_words size if paragraph is too long
 
     Parameters
     ----------
@@ -128,40 +140,54 @@ def split_docs(documents: List[Document], max_words: int = 300, split_type: Spli
 
     split_op = {
         SplitType.PARAGRAPH: split_by_paragraphs,
-        SplitType.SECTION: split_by_sections
+        SplitType.SECTION: split_by_sections,
     }
 
     if not check_same_doc(documents):
-        raise ValueError("All documents must come from the same source (title or source)")
+        raise ValueError(
+            "All documents must come from the same source (title or source)"
+        )
 
     split_documents = []
     merged_text = " ".join([doc.page_content for doc in documents])
     pages_lengths = [len(doc.page_content) + 1 for doc in documents]
     pages_lengths[-1] -= 1  # remove additional space at the end of merged text
 
-    pages_end_idx = [sum(pages_lengths[:i + 1]) for i in range(len(pages_lengths))]
+    pages_end_indices = [sum(pages_lengths[: i + 1]) for i in range(len(pages_lengths))]
 
     separate_txt_indices = split_op.get(split_type, split_by_sections)(merged_text)
 
     for i, txt_idx in enumerate(separate_txt_indices[1:], 1):
-        chunk_to_split = merged_text[separate_txt_indices[i - 1]: txt_idx].split(" ")
+        chunk_to_split = merged_text[separate_txt_indices[i - 1] : txt_idx].split(" ")
         begin_txt_idx = separate_txt_indices[i - 1]
 
         # check if concatenated text is smaller than max_words
         if len(chunk_to_split) <= max_words:
-            doc_metadata = locate_metadata(documents, pages_end_idx, begin_txt_idx)
+            doc_metadata = locate_metadata(documents, pages_end_indices, begin_txt_idx)
             split_documents.append(
-                Document(page_content=merged_text[begin_txt_idx: txt_idx],
-                         metadata=doc_metadata))
+                Document(
+                    page_content=merged_text[begin_txt_idx:txt_idx],
+                    metadata=doc_metadata,
+                )
+            )
 
         else:
-            batch_word_indices = [j for j in range(0, len(chunk_to_split), max_words)] + [len(chunk_to_split)]
+            batch_word_indices = [
+                j for j in range(0, len(chunk_to_split), max_words)
+            ] + [len(chunk_to_split)]
             previous_end_idx = 0
 
             for batch_idx in range(len(batch_word_indices) - 1):
-                text = " ".join(chunk_to_split[batch_word_indices[batch_idx]: batch_word_indices[batch_idx + 1]])
-                metadata = locate_metadata(documents, pages_end_idx,
-                                           begin_txt_idx + previous_end_idx)
+                text = " ".join(
+                    chunk_to_split[
+                        batch_word_indices[batch_idx] : batch_word_indices[
+                            batch_idx + 1
+                        ]
+                    ]
+                )
+                metadata = locate_metadata(
+                    documents, pages_end_indices, begin_txt_idx + previous_end_idx
+                )
                 split_documents.append(Document(page_content=text, metadata=metadata))
                 previous_end_idx += len(text) + 1
 
@@ -170,5 +196,3 @@ def split_docs(documents: List[Document], max_words: int = 300, split_type: Spli
         doc.metadata["split_part"] = i
 
     return split_documents
-
-

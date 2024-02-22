@@ -20,13 +20,14 @@ from arxiv_utils import (
     ExtendedArxivRetriever,
 )
 from templates import ShortInfoSummary, DEFAULT_PROMPT_REGISTER, PromptHolder
-from utils import check_same_doc, get_document_name,  split_docs, SplitType
+from utils import check_same_doc, get_document_name, split_docs, SplitType
 
 logger = logging.getLogger(__name__)
 
 
 class SearchType(Enum):
     """Search Type Enum for VectorStore.search()"""
+
     MMR = "mmr"
     SIMILARITY = "similarity"
 
@@ -41,8 +42,11 @@ class PaperDatasetLC:
     max_num_words = 300  # TODO: method to take from llm and setters
 
     def __init__(
-        self, db: Optional[Chroma] = None, llm: Optional[BaseLanguageModel] = None,
-            doc_split_type: SplitType = SplitType.SECTION, max_num_words: int = 300
+        self,
+        db: Optional[Chroma] = None,
+        llm: Optional[BaseLanguageModel] = None,
+        doc_split_type: SplitType = SplitType.SECTION,
+        max_num_words: int = 300,
     ):
         self._split_type = doc_split_type
         self.max_num_words = max_num_words
@@ -51,7 +55,8 @@ class PaperDatasetLC:
 
         if not self._db or not isinstance(self._db, VectorStore):
             logger.warning(
-                "Dataset with not specified or invalid database" " - using Chroma with OpenAI embeddings and LLM"
+                "Dataset with not specified or invalid database"
+                " - using Chroma with OpenAI embeddings and LLM"
             )
             try:
                 import openai
@@ -62,8 +67,9 @@ class PaperDatasetLC:
                     embedding_function=OpenAIEmbeddings(
                         openai_api_key=openai.api_key,
                         model="text-embedding-3-small",
-                        collection_metadata={"hnsw:space": "cosine"}
-                    ))
+                        collection_metadata={"hnsw:space": "cosine"},
+                    )
+                )
                 self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
 
             except ImportError as err:
@@ -112,7 +118,9 @@ class PaperDatasetLC:
                     # Add missing data
                     document.metadata[key] = metadata["key"]
 
-        documents = split_docs([document], max_words=self.max_num_words, split_type=self._split_type)
+        documents = split_docs(
+            [document], max_words=self.max_num_words, split_type=self._split_type
+        )
 
         try:
             doc_uuids = self._db.add_documents(documents)
@@ -147,7 +155,11 @@ class PaperDatasetLC:
             f" for file: {filepath}"
 
         try:
-            data = split_docs(PyMuPDFLoader(filepath).load(), max_words=self.max_num_words, split_type=self._split_type)
+            data = split_docs(
+                PyMuPDFLoader(filepath).load(),
+                max_words=self.max_num_words,
+                split_type=self._split_type,
+            )
 
             # for doc in tqdm(PyMuPDFLoader(filepath).load(), desc="Loading pdf pages"):
             #     split_docs = self._split_document_by_length(doc)
@@ -211,8 +223,11 @@ class PaperDatasetLC:
                     meta["title"] = "Unknown Text"
 
                 valid_records.extend(
-                    split_docs([Document(page_content=text, metadata=meta)],
-                               max_words=self.max_num_words, split_type=self._split_type)
+                    split_docs(
+                        [Document(page_content=text, metadata=meta)],
+                        max_words=self.max_num_words,
+                        split_type=self._split_type,
+                    )
                 )
 
             except ValueError as err:
@@ -313,7 +328,12 @@ class PaperDatasetLC:
 
             for doc_group in grouped_docs:
                 splited_documents.extend(
-                    split_docs(doc_group, max_words=self.max_num_words, split_type=self._split_type))
+                    split_docs(
+                        doc_group,
+                        max_words=self.max_num_words,
+                        split_type=self._split_type,
+                    )
+                )
 
             doc_uuids = self._db.add_documents(splited_documents)
             return doc_uuids
@@ -526,8 +546,12 @@ class PaperDatasetLC:
         )
 
     def similarity_search_with_scores(
-        self, query: str, n_results: int = 3, score_threshold: Optional[float] = None,
-        search_type: SearchType = SearchType.MMR, db_filter: Optional[Dict[str, str]] = None,
+        self,
+        query: str,
+        n_results: int = 3,
+        score_threshold: Optional[float] = None,
+        search_type: SearchType = SearchType.MMR,
+        db_filter: Optional[Dict[str, str]] = None,
     ) -> List[Tuple[Document, float]]:
         """
 
@@ -559,7 +583,11 @@ class PaperDatasetLC:
             )
 
         return self._db.similarity_search_with_relevance_scores(
-            query=query, k=n_results, filter=db_filter, score_threshold=score_threshold, search_type=search_type.value
+            query=query,
+            k=n_results,
+            filter=db_filter,
+            score_threshold=score_threshold,
+            search_type=search_type.value,
         )
 
     def llm_search(
@@ -635,17 +663,32 @@ class PaperDatasetLC:
         self,
         document_ids: Union[str, Iterable[str]] = None,
         llm: Optional[BaseLanguageModel] = None,
-        force_reload: bool = False, pydantic_object: BaseModel = ShortInfoSummary,
+        force_reload: bool = False,
+        pydantic_object: BaseModel = ShortInfoSummary,
     ):
         parser = PydanticOutputParser(pydantic_object=pydantic_object)
-        self.llm_doc_meta_updater(update_key="new_features", prompt="identify_features", predefined_prompt=True,
-                                  document_ids=document_ids, llm=llm, force_reload=force_reload, output_parser=parser)
+        self.llm_doc_meta_updater(
+            update_key="new_features",
+            prompt="identify_features",
+            predefined_prompt=True,
+            document_ids=document_ids,
+            llm=llm,
+            force_reload=force_reload,
+            output_parser=parser,
+        )
 
-    def llm_doc_meta_updater(self, update_key: str, prompt: Union[str, PromptTemplate], predefined_prompt: bool = True,
-                             document_ids: Union[str, Iterable[str], None] = None, llm: Optional[BaseLanguageModel] = None,
-                             output_parser: Optional[BaseOutputParser] = None, force_reload: bool = False,
-                             **var_kwargs):
-        """ Update document metadata with answers from LLM model based on predefined prompt questions
+    def llm_doc_meta_updater(
+        self,
+        update_key: str,
+        prompt: Union[str, PromptTemplate],
+        predefined_prompt: bool = True,
+        document_ids: Union[str, Iterable[str], None] = None,
+        llm: Optional[BaseLanguageModel] = None,
+        output_parser: Optional[BaseOutputParser] = None,
+        force_reload: bool = False,
+        **var_kwargs,
+    ):
+        """Update document metadata with answers from LLM model based on predefined prompt questions
 
         Parameters
         ----------
@@ -685,17 +728,33 @@ class PaperDatasetLC:
         """
         llm: BaseLanguageModel = llm or self._default_llm
 
-        if not update_key or update_key in ("title", "source", "file_path", "date", "date_int", "page", "total_pages",
-                                            "author", "creationDate", "split_part"):
+        if not update_key or update_key in (
+            "title",
+            "source",
+            "file_path",
+            "date",
+            "date_int",
+            "page",
+            "total_pages",
+            "author",
+            "creationDate",
+            "split_part",
+        ):
             logger.error(f"Update key {update_key} is not allowed")
             return
 
         if "." in update_key:
-            logger.error(f"Update key {update_key} containing dot is restricted to substructures")
+            logger.error(
+                f"Update key {update_key} containing dot is restricted to substructures"
+            )
             return
 
         if isinstance(prompt, str):
-            prompt_template = self._prompts.get(prompt) if predefined_prompt else PromptTemplate(template=prompt)
+            prompt_template = (
+                self._prompts.get(prompt)
+                if predefined_prompt
+                else PromptTemplate(template=prompt)
+            )
 
         else:
             # Already defined PromptTemplate
@@ -713,10 +772,16 @@ class PaperDatasetLC:
         if output_parser:
             if "format_instructions" not in prompt_template.template:
                 instructed_prompt = prompt_template.template.copy()
-                instructed_prompt.template = instructed_prompt.template + "\n" + output_parser.get_format_instructions()
+                instructed_prompt.template = (
+                    instructed_prompt.template
+                    + "\n"
+                    + output_parser.get_format_instructions()
+                )
 
             else:
-                instructed_prompt = prompt_template.partial(format_instructions=output_parser.get_format_instructions())
+                instructed_prompt = prompt_template.partial(
+                    format_instructions=output_parser.get_format_instructions()
+                )
 
             chain = instructed_prompt | llm | output_parser
 
@@ -730,7 +795,7 @@ class PaperDatasetLC:
             return
 
         for doc_id, doc_text, metadata in tqdm(
-                zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating metadata"
+            zip(docs["ids"], docs["documents"], docs["metadatas"]), "Updating metadata"
         ):
             # TODO: think about rewrite for running in parallel if llm allows
             if metadata.get(update_key) and not force_reload:
@@ -757,7 +822,11 @@ class PaperDatasetLC:
 
                 for key, value in data_dict.items():
                     key_name = f"{update_key}.{key}"
-                    metadata[key_name] = value if isinstance(value, (str, float, int, bool)) else str(value)
+                    metadata[key_name] = (
+                        value
+                        if isinstance(value, (str, float, int, bool))
+                        else str(value)
+                    )
                     added_keys.append(key_name)
 
                 metadata[f"{update_key}.cls._type"] = data.__class__.__name__
@@ -861,15 +930,22 @@ class PaperDatasetLC:
         for i, doc_meta in enumerate(
             tqdm(documents["metadatas"], desc="Searching documents")
         ):
-            if re.search(search_value, doc_meta.get("title", "") + " " + doc_meta.get("source", "")):
+            if re.search(
+                search_value,
+                doc_meta.get("title", "") + " " + doc_meta.get("source", ""),
+            ):
                 found_ids.append(documents["ids"][i])
 
         return self.get(ids=found_ids if found_ids else [""], include=include)
 
-    def summarize_docs(self, document_ids: Union[str, Iterable[str]] = None,
-                       llm: Optional[BaseLanguageModel] = None,
-                       summarize_prompt: str = "summarize_doc", refine_prompt: str = "summarize_doc_refine"):
-        """ Summarize documents by LLM model
+    def summarize_docs(
+        self,
+        document_ids: Union[str, Iterable[str]] = None,
+        llm: Optional[BaseLanguageModel] = None,
+        summarize_prompt: str = "summarize_doc",
+        refine_prompt: str = "summarize_doc_refine",
+    ):
+        """Summarize documents by LLM model
 
         .. note: This only uses predefined prompts as it is not intended to support custom prompts
 
