@@ -28,7 +28,7 @@ def get_document_name(document: Union[Document, Dict]) -> str:
             name = os.path.basename(name)
 
         if name or title:
-            return f"{name or title} - page: {meta.get('page', 0)}"
+            return f"{name or title} - page: {meta.get('page', 0)}, part: {meta.get('split_part', 0)}"
 
     return "Unknown"
 
