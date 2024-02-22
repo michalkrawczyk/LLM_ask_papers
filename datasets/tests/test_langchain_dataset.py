@@ -37,7 +37,7 @@ except ImportError:
 def test_document_storage():
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L12-v2") \
         if SENTENCE_TRANSFORMERS_AVAILABLE else (
-        OpenAIEmbeddings(openai_api_key=openai.api_key, model="text-embedding-ada-002"))
+        OpenAIEmbeddings(openai_api_key=openai.api_key, model="text-embedding-3-small"))
 
     dataset = PaperDatasetLC(db=Chroma(embedding_function=embeddings, collection_metadata={"hnsw:space": "cosine"}),
                              doc_split_type=SplitType.SECTION)
@@ -100,7 +100,7 @@ def test_llm():
 
     DEFAULT_PROMPT_REGISTER.load_defined_prompt(name="identify_features", prompt=prompt)
 
-    embeddings = OpenAIEmbeddings(openai_api_key=openai.api_key, model="text-embedding-ada-002")
+    embeddings = OpenAIEmbeddings(openai_api_key=openai.api_key, model="text-embedding-3-small")
     model = ChatOpenAI(openai_api_key=openai.api_key, model=model_name)
     # chain = LLMChain(llm=model, prompt=prompt)
 

@@ -59,9 +59,11 @@ class PaperDatasetLC:
                 from langchain.embeddings.openai import OpenAIEmbeddings
 
                 self._db = Chroma(
-                    embedding_function=OpenAIEmbeddings(openai_api_key=openai.api_key),
-                    collection_metadata={"hnsw:space": "cosine"}
-                )
+                    embedding_function=OpenAIEmbeddings(
+                        openai_api_key=openai.api_key,
+                        model="text-embedding-3-small",
+                        collection_metadata={"hnsw:space": "cosine"}
+                    ))
                 self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
 
             except ImportError as err:
