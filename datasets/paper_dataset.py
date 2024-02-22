@@ -70,7 +70,11 @@ class PaperDatasetLC:
                         collection_metadata={"hnsw:space": "cosine"},
                     )
                 )
-                self._default_llm = OpenAI(temperature=0, openai_api_key=openai.api_key)
+                self._default_llm = OpenAI(
+                    temperature=0,
+                    openai_api_key=openai.api_key,
+                    model_name="gpt-3.5-turbo-0125",
+                )
 
             except ImportError as err:
                 logger.error(f"Failed to import OpenAI and dependencies: {err}")
