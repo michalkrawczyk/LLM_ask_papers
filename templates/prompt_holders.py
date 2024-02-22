@@ -19,6 +19,7 @@ from langchain.schema import BasePromptTemplate
 # ROOT_PATH = Path(__file__).resolve().parent.parent
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class PromptHolder:
     PROMPTS: Dict[str, BasePromptTemplate] = field(default_factory=dict)
@@ -38,7 +39,9 @@ class PromptHolder:
         except Exception as err:
             logger.error(f"Error loading prompt {name} from {prompt_path}: {err}")
 
-    def load_defined_prompt(self, name: str, prompt: BasePromptTemplate, force_reload: bool = False):
+    def load_defined_prompt(
+        self, name: str, prompt: BasePromptTemplate, force_reload: bool = False
+    ):
         if name not in self.PROMPTS or force_reload:
             self.PROMPTS[name] = prompt
         else:

@@ -19,7 +19,9 @@ def register_prompt(
     force_reload: bool = False,
 ):
     # Note:
-    prompt_register.load_defined_prompt(name=name, prompt=prompt, force_reload=force_reload)
+    prompt_register.load_defined_prompt(
+        name=name, prompt=prompt, force_reload=force_reload
+    )
 
 
 def create_and_register_prompt(
