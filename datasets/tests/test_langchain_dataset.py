@@ -99,7 +99,7 @@ def test_document_storage():
 
 
 @pytest.mark.skipif(
-    not OPENAI_AVAILABLE or True, reason="OpenAI not available (not installed or invalid key)"
+    not OPENAI_AVAILABLE, reason="OpenAI not available (not installed or invalid key)"
 )
 @pytest.mark.filterwarnings("ignore:.* was deprecated*")
 def test_llm():
