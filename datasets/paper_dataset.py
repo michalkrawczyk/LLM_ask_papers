@@ -7,11 +7,12 @@ from typing import Any, Dict, List, Union, Tuple, Optional, Iterable
 from langchain.base_language import BaseLanguageModel
 from langchain.chains import LLMChain, RetrievalQA
 from langchain.chains.summarize import load_summarize_chain
-from langchain.document_loaders import PyMuPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import Document, BaseOutputParser
-from langchain.vectorstores import Chroma, VectorStore
+from langchain_community.vectorstores import Chroma, VectorStore
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel
 from tqdm import tqdm
@@ -34,7 +35,7 @@ class SearchType(Enum):
 
 class PaperDatasetLC:
     _db: Optional[Chroma] = None
-    _default_llm: Optional[BaseLanguageModel] = None
+    _default_llm: Optional[Union[BaseLanguageModel, BaseChatModel]] = None
     _prompts: PromptHolder = DEFAULT_PROMPT_REGISTER
     _split_type: SplitType = SplitType.SECTION
 
@@ -44,7 +45,7 @@ class PaperDatasetLC:
     def __init__(
         self,
         db: Optional[Chroma] = None,
-        llm: Optional[BaseLanguageModel] = None,
+        llm: Optional[Union[BaseLanguageModel, BaseChatModel]] = None,
         doc_split_type: SplitType = SplitType.SECTION,
         max_num_words: int = 300,
     ):
@@ -60,8 +61,8 @@ class PaperDatasetLC:
             )
             try:
                 import openai
-                from langchain.llms.openai import OpenAI
-                from langchain.embeddings.openai import OpenAIEmbeddings
+                from langchain_community.chat_models import ChatOpenAI
+                from langchain_community.embeddings import OpenAIEmbeddings
 
                 self._db = Chroma(
                     embedding_function=OpenAIEmbeddings(
@@ -70,10 +71,10 @@ class PaperDatasetLC:
                         collection_metadata={"hnsw:space": "cosine"},
                     )
                 )
-                self._default_llm = OpenAI(
+                self._default_llm = ChatOpenAI(
                     temperature=0,
                     openai_api_key=openai.api_key,
-                    model_name="gpt-3.5-turbo-0125",
+                    model_name="gpt-3.5-turbo",
                 )
 
             except ImportError as err:

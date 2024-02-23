@@ -2,7 +2,7 @@ import pytest
 import yaml
 from pathlib import Path
 
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
 # TODO: embeddings and dataset same for all test units?
 
@@ -13,7 +13,7 @@ ROOT_PATH = Path(__file__).resolve().parents[2]
 
 try:
     import openai
-    from langchain.embeddings import OpenAIEmbeddings
+    from langchain_community.embeddings import OpenAIEmbeddings
 
     with open(ROOT_PATH / "openai_key.yaml", "r") as f:
         openai.api_key = yaml.safe_load(f)["openai_api_key"]
@@ -24,7 +24,7 @@ except Exception as err:
     print(err)
 
 try:
-    from langchain.embeddings import HuggingFaceEmbeddings
+    from langchain_community.embeddings import HuggingFaceEmbeddings
     import sentence_transformers
 
     SENTENCE_TRANSFORMERS_AVAILABLE = True
@@ -37,6 +37,7 @@ except ImportError:
     not (SENTENCE_TRANSFORMERS_AVAILABLE or OPENAI_AVAILABLE),
     reason="Not found any llm module",
 )
+@pytest.mark.filterwarnings("ignore:.* was deprecated*")
 def test_document_storage():
     embeddings = (
         HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L12-v2")
@@ -98,14 +99,13 @@ def test_document_storage():
 
 
 @pytest.mark.skipif(
-    not OPENAI_AVAILABLE, reason="OpenAI not available (not installed or invalid key)"
+    not OPENAI_AVAILABLE or True, reason="OpenAI not available (not installed or invalid key)"
 )
+@pytest.mark.filterwarnings("ignore:.* was deprecated*")
 def test_llm():
     from langchain.prompts import PromptTemplate
-    from langchain.chat_models import ChatOpenAI
+    from langchain_community.chat_models import ChatOpenAI
     from templates import DEFAULT_PROMPT_REGISTER, create_and_register_prompt
-
-    model_name = "gpt-3.5-turbo"
 
     text = """Create short, specific summary for research paper. Identify the following items for given text:
   - Model Name
@@ -134,7 +134,7 @@ def test_llm():
     embeddings = OpenAIEmbeddings(
         openai_api_key=openai.api_key, model="text-embedding-3-small"
     )
-    model = ChatOpenAI(openai_api_key=openai.api_key, model=model_name)
+    model = ChatOpenAI(openai_api_key=openai.api_key, model="gpt-3.5-turbo")
     # chain = LLMChain(llm=model, prompt=prompt)
 
     dataset = PaperDatasetLC(
@@ -150,3 +150,7 @@ def test_llm():
     # print(dataset.llm_search_with_sources("identify_features"))
     dataset.update_document_features(docs_ids[0])
     print(dataset.get_containing_field("new_features", include=["metadatas"]))
+
+    result, docs = dataset.llm_search("what is the architecture of yolov6", chain_type="map_reduce",
+                                      return_source_documents=True)
+    print("llm search result", result)
