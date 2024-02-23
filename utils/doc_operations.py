@@ -163,7 +163,7 @@ def split_docs(
 
         # check if concatenated text is smaller than max_words
         if len(chunk_to_split) <= max_words:
-            doc_metadata = locate_metadata(documents, pages_end_indices, begin_txt_idx)
+            doc_metadata = locate_metadata(documents, pages_end_indices, begin_txt_idx).copy()
             split_documents.append(
                 Document(
                     page_content=merged_text[begin_txt_idx:txt_idx],
@@ -187,12 +187,12 @@ def split_docs(
                 )
                 metadata = locate_metadata(
                     documents, pages_end_indices, begin_txt_idx + previous_end_idx
-                )
+                ).copy()
+
                 split_documents.append(Document(page_content=text, metadata=metadata))
                 previous_end_idx += len(text) + 1
 
-    for i, doc in enumerate(split_documents):
-        # Add split part number to metadata
-        doc.metadata["split_part"] = i
+    for i, d in enumerate(split_documents):
+        d.metadata["split_part"] = i
 
     return split_documents
