@@ -13,7 +13,10 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import Document, BaseOutputParser
 from langchain_community.vectorstores import Chroma, VectorStore
+from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain.prompts import PromptTemplate
+
+import numpy as np
 from pydantic import BaseModel
 from tqdm import tqdm
 
@@ -391,40 +394,40 @@ class PaperDatasetLC:
             )
         ]
 
-    def list_new_features(self, store_result: bool = True) -> List[str]:
-        """List of all new features detected in documents
-
-        Parameters
-        ----------
-        store_result: bool
-            If True - Store result in class variable for faster access
-
-        Returns
-        -------
-        List[str]
-            List of all new features detected in documents
-
-        """
-        if self._feature_list:
-            return self._feature_list
-
-        feature_set = set()
-
-        for metadata in tqdm(
-            self.get(where={"new_features": {"$ne": ""}}, include=["metadatas"])[
-                "metadatas"
-            ],
-            desc="Listing features",
-        ):
-            features = metadata["new_features"].lower().split(", ")
-            feature_set.update(features)
-
-        feature_list = list(feature_set)
-
-        if store_result:
-            self._feature_list = feature_list  # type: ignore
-
-        return feature_list
+    # def list_new_features(self, store_result: bool = True) -> List[str]:
+    #     """List of all new features detected in documents
+    #
+    #     Parameters
+    #     ----------
+    #     store_result: bool
+    #         If True - Store result in class variable for faster access
+    #
+    #     Returns
+    #     -------
+    #     List[str]
+    #         List of all new features detected in documents
+    #
+    #     """
+    #     if self._feature_list:
+    #         return self._feature_list
+    #
+    #     feature_set = set()
+    #
+    #     for metadata in tqdm(
+    #         self.get(where={"new_features": {"$ne": ""}}, include=["metadatas"])[
+    #             "metadatas"
+    #         ],
+    #         desc="Listing features",
+    #     ):
+    #         features = metadata["new_features"].lower().split(", ")
+    #         feature_set.update(features)
+    #
+    #     feature_list = list(feature_set)
+    #
+    #     if store_result:
+    #         self._feature_list = feature_list  # type: ignore
+    #
+    #     return feature_list
 
     def list_available_fields(self) -> List[str]:
         """List of all available metadata fields in documents"""
@@ -587,13 +590,51 @@ class PaperDatasetLC:
                 "may not work with other databases than Chroma"
             )
 
-        return self._db.similarity_search_with_relevance_scores(
-            query=query,
-            k=n_results,
-            filter=db_filter,
-            score_threshold=score_threshold,
-            search_type=search_type.value,
-        )
+        search_results = []
+
+        if search_type == search_type.SIMILARITY:
+            search_results = self._db.similarity_search_with_relevance_scores(
+                query=query,
+                k=n_results,
+                score_threshold=score_threshold,
+                filter=db_filter,
+            )
+
+        elif search_type == search_type.MMR:
+            # MMR search
+            embedding = self._db.embeddings.embed_query(query)
+
+            # Unfortunately _collection.query() method is not public and there is no public function to get results other way
+            filter_results = self._db._collection.query(
+                query_embeddings=embedding,
+                n_results=n_results * 2,
+                where=db_filter,
+                # where_document=where_document,
+                include=["metadatas", "documents", "distances", "embeddings"],
+            )
+
+            mmr_selected = maximal_marginal_relevance(
+                np.array(embedding, dtype=np.float32),
+                filter_results["embeddings"][0],
+                k=n_results,
+                lambda_mult=score_threshold or 0.5,
+            )
+
+            search_results = [
+                (
+                    Document(
+                        page_content=filter_results["documents"][0][i],
+                        metadata=filter_results["metadatas"][0][i],
+                    ),
+                    filter_results["distances"][0][i],
+                )
+                for i in mmr_selected
+            ]
+
+        else:
+            logger.error(f"Search type {search_type} not supported")
+
+        return search_results
 
     def llm_search(
         self,

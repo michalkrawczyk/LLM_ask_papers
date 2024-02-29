@@ -70,7 +70,7 @@ def test_document_storage():
     assert (
         len(stored_docs) == 17
     ), "Invalid length from 'list_documents_by_id'"  # 14 from pdf + one text
-    print(dataset.unique_list_of_documents())
+    # print(dataset.unique_list_of_documents())
 
     assert (
         len(dataset.unique_list_of_documents()) == 2
@@ -97,9 +97,14 @@ def test_document_storage():
         len(dataset.similarity_search("new feature", n_results=2)) == 2
     ), "similarity_search should return 2 results"
 
+    assert (
+        len(dataset.similarity_search_with_scores("new feature", n_results=3)) == 3
+    ), "similarity_search_with_scores should return 3 results"
+
 
 @pytest.mark.skipif(
-    not OPENAI_AVAILABLE, reason="OpenAI not available (not installed or invalid key)"
+    not OPENAI_AVAILABLE,
+    reason="OpenAI not available (not installed or invalid key)",
 )
 @pytest.mark.filterwarnings("ignore:.* was deprecated*")
 def test_llm():
@@ -151,6 +156,9 @@ def test_llm():
     dataset.update_document_features(docs_ids[0])
     print(dataset.get_containing_field("new_features", include=["metadatas"]))
 
-    result, docs = dataset.llm_search("what is the architecture of yolov6", chain_type="map_reduce",
-                                      return_source_documents=True)
+    result, docs = dataset.llm_search(
+        "what is the architecture of yolov6",
+        chain_type="map_reduce",
+        return_source_documents=True,
+    )
     print("llm search result", result)
