@@ -69,7 +69,7 @@ def test_document_storage():
 
     assert (
         len(stored_docs) == 17
-    ), "Invalid length from 'list_documents_by_id'"  # 14 from pdf + one text
+    ), "Invalid length from 'list_documents_by_id'"  # 16 from pdf + one text
     # print(dataset.unique_list_of_documents())
 
     assert (
@@ -100,6 +100,15 @@ def test_document_storage():
     assert (
         len(dataset.similarity_search_with_scores("new feature", n_results=3)) == 3
     ), "similarity_search_with_scores should return 3 results"
+
+    assert (
+        len(
+            dataset.search_by_field(
+                "source", "00386", regex_match=True, include=["metadatas"]
+            )["metadatas"]
+        )
+        == 16
+    ), "search_by_field should return 14 results (from 2302.00386.pdf)"
 
 
 @pytest.mark.skipif(

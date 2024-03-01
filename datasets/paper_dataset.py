@@ -927,7 +927,7 @@ class PaperDatasetLC:
         for i, doc_meta in enumerate(
             tqdm(documents["metadatas"], desc="Searching documents")
         ):
-            if search_value in doc_meta[field_name]:
+            if re.search(search_value, doc_meta[field_name]):
                 found_ids.append(documents["ids"][i])
 
         return self.get(ids=found_ids if found_ids else [""], include=include)
