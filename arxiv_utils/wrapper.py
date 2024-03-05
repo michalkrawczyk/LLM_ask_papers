@@ -92,7 +92,7 @@ class ArxivAPIWrapper2(BaseModel):
     save_pdf: bool = True
     file_save_dir: str = "."
     overwrite_existing: bool = False
-    separate_pages: bool = False
+    separate_pages: bool = True
 
     # verbose: bool = False
 
@@ -220,7 +220,8 @@ class ArxivAPIWrapper2(BaseModel):
                     len(texts) - 1 and idx
                 )  # Set page 0 if only one page, to mark whole document
                 doc = Document(
-                    page_content=text[: self.doc_content_chars_max], metadata=metadata
+                    page_content=text[: self.doc_content_chars_max],
+                    metadata=metadata.copy(),  # metadata.copy() to avoid overwriting
                 )
                 docs.append(doc)
 
