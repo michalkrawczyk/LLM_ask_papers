@@ -160,9 +160,12 @@ def test_llm():
 
     docs_ids = dataset.add_pdf_file(str(ROOT_PATH / "sample_documents/2302.00386.pdf"))
 
+    dataset.add_arxiv_by_query("yolov7", max_docs=1)
+
     print("llm search")
     # print(dataset.llm_search_with_sources("identify_features"))
     dataset.update_document_features(docs_ids[0])
+
     print(dataset.get_containing_field("new_features", include=["metadatas"]))
 
     result, docs = dataset.llm_search(

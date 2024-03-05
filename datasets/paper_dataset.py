@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class SearchType(Enum):
     """Search Type Enum for VectorStore.search()"""
+
     MMR = "mmr"
     SIMILARITY = "similarity"
 
@@ -285,15 +286,18 @@ class PaperDatasetLC:
 
         return []  # No Object added - return empty list
 
-    def add_arxiv_by_query(self, query: str, **kwargs: Any) -> List[str]:
+    def add_arxiv_by_query(self, query: str, get_latest: bool = True, **retriever_kwargs: Any) -> List[str]:
         """Search on arxiv papers by search query and add them to vector database
 
         Parameters
         ----------
         query: str
            search_query for Arxiv
-        kwargs:
+        get_latest: bool
+            If True - Search for latest uploaded papers
+        retriever_kwargs:
             Additional kwargs for arxiv_utils.ExtendedArxivRetriever object
+
 
         Returns
         -------
@@ -302,9 +306,10 @@ class PaperDatasetLC:
 
         """
 
-        retriever = ExtendedArxivRetriever(**kwargs)
+        retriever = ExtendedArxivRetriever(**retriever_kwargs)
         try:
-            docs = retriever.get_relevant_documents(query)
+            docs = retriever.get_relevant_documents(query) \
+                if not get_latest else retriever.get_latest_documents_by_query(query)
             doc_uuids = self.add_documents(docs)
 
             return doc_uuids
@@ -691,7 +696,7 @@ class PaperDatasetLC:
 
         if not retriever_kwargs:
             retriever_kwargs = {
-                "search_type": SearchType.MMR.value,
+                # "search_type": SearchType.MMR.value,
             }
 
         if not chain_kwargs:
