@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 class SearchType(Enum):
     """Search Type Enum for VectorStore.search()"""
-
     MMR = "mmr"
     SIMILARITY = "similarity"
 
@@ -256,7 +255,7 @@ class PaperDatasetLC:
             logger.warning(f"Failed to add texts \n" f"  {err}")
             return []  # No Object added - return empty list
 
-    def add_papers_by_id(self, id_list: Iterable[str], **kwargs: Any) -> List[str]:
+    def add_arxiv_by_id(self, id_list: Iterable[str], **kwargs: Any) -> List[str]:
         """Search on arxiv papers by ID and add them to vector database
 
         Parameters
@@ -286,7 +285,7 @@ class PaperDatasetLC:
 
         return []  # No Object added - return empty list
 
-    def add_documents_by_query(self, query: str, **kwargs: Any) -> List[str]:
+    def add_arxiv_by_query(self, query: str, **kwargs: Any) -> List[str]:
         """Search on arxiv papers by search query and add them to vector database
 
         Parameters
@@ -691,7 +690,9 @@ class PaperDatasetLC:
             raise RuntimeError("LLM not provided")
 
         if not retriever_kwargs:
-            retriever_kwargs = {}
+            retriever_kwargs = {
+                "search_type": SearchType.MMR.value,
+            }
 
         if not chain_kwargs:
             chain_kwargs = {}
