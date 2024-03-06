@@ -1,5 +1,6 @@
-from .paper_dataset import PaperDataset
+from .paper_dataset import PaperDatasetLC, SearchType
 
 __all__ = [
-    "PaperDataset"
+    "PaperDatasetLC",
+    "SearchType",
 ]

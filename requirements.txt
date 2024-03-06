@@ -1,5 +1,11 @@
 openai==0.27.6
-PyPDF2==3.0.1
 arxiv==1.4.7
-pyyaml==6.0
+PyYAML==6.0
 tqdm==4.65.0
+tiktoken==0.6.0
+PyMuPDF==1.22.3
+pydantic==1.10.9
+langchain==0.1.9
+langchain-community==0.0.24
+# sentence-transformers==2.2.2
+chromadb==0.3.26
